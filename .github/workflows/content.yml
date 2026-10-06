@@ -1,0 +1,86 @@
+name: Publish content
+
+# Fetches the word list from the Apps Script (admin action `content`), validates it (scripts/build-content.mjs)
+# and publishes it as content.json next to the app: DEV → /NT2/dev/content.json, PROD → /NT2/content.json.
+# The files live on the `content` branch (history = every published version); the Pages deploy copies them.
+# Triggers: by hand (Actions → Publish content → Run workflow) or by the teacher page's "Publiceren"
+# (repository_dispatch, event type `publish`, client_payload.env = dev|prod).
+on:
+  workflow_dispatch:
+    inputs:
+      env:
+        description: Environment
+        type: choice
+        options: [dev, prod]
+        default: dev
+  repository_dispatch:
+    types: [publish]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: content
+  cancel-in-progress: false
+
+jobs:
+  content:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.build.outputs.changed }}
+    steps:
+      - name: Environment
+        id: env
+        env:
+          IN: ${{ github.event.inputs.env || github.event.client_payload.env }}
+        run: |
+          case "$IN" in dev|prod) echo "env=$IN" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::env must be dev or prod (got '$IN')"; exit 1 ;; esac
+
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          path: main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Content branch
+        working-directory: main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898309+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin content >/dev/null; then
+            git fetch origin content
+            git worktree add ../content origin/content
+          else
+            git worktree add --orphan -b content ../content
+          fi
+
+      - name: Build content.json
+        id: build
+        env:
+          API_URL_DEV: ${{ secrets.API_URL_DEV }}
+          API_URL_PROD: ${{ secrets.API_URL_PROD }}
+          ADMIN_TOKEN_DEV: ${{ secrets.ADMIN_TOKEN_DEV }}
+          ADMIN_TOKEN_PROD: ${{ secrets.ADMIN_TOKEN_PROD }}
+        run: node main/scripts/build-content.mjs "${{ steps.env.outputs.env }}" "content/${{ steps.env.outputs.env }}/content.json" | tee -a "$GITHUB_STEP_SUMMARY" | grep -E '^changed=' >> "$GITHUB_OUTPUT"
+
+      - name: Commit to the content branch
+        if: steps.build.outputs.changed == 'true'
+        working-directory: content
+        run: |
+          git add "${{ steps.env.outputs.env }}/content.json"
+          git -c user.name="github-actions[bot]" -c user.email="41898309+github-actions[bot]@users.noreply.github.com" \
+            commit -m "Publish ${{ steps.env.outputs.env }} content ($(node -p "require('./${{ steps.env.outputs.env }}/content.json').version"))"
+          git push origin HEAD:content
+
+  deploy:
+    needs: content
+    if: needs.content.outputs.changed == 'true'
+    uses: ./.github/workflows/deploy.yml
+    secrets: inherit

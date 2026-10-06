@@ -42,6 +42,7 @@ function doPost(e) {
 
     if (role !== 'admin') throw apiError_('forbidden', 'Admin token required for ' + action);
     switch (action) {
+      case 'content': return getCards_(); // the word list for content.json (GitHub Action, admin token in the body)
       case 'listCards': return adminListCards_();
       case 'listUntagged': return adminListUntagged_();
       case 'tags': return adminTags_(body.add);

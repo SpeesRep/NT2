@@ -1,21 +1,25 @@
 #!/usr/bin/env node
-// Admin API client. Reads URL + ADMIN token from .env.local and never prints the token.
+// Admin API client. Reads URL + ADMIN token from .env.local or the environment and never prints the token.
 // Usage: node scripts/admin.mjs <dev|prod> <action> [json-payload | @file.json]
 //   node scripts/admin.mjs dev listUntagged
 //   node scripts/admin.mjs dev setTags '{"updates":[{"id":"c_1","tags":["food"]}]}'
 //   node scripts/admin.mjs dev appendInbox @/tmp/rows.json
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
+/** .env.local (optional, local use) overridden by the process environment (GitHub Actions secrets). */
 export function loadEnv() {
   const env = {};
-  for (const line of readFileSync(join(root, '.env.local'), 'utf8').split('\n')) {
-    const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
-    if (m) env[m[1]] = m[2].replace(/^"|"$/g, '');
+  if (existsSync(join(root, '.env.local'))) {
+    for (const line of readFileSync(join(root, '.env.local'), 'utf8').split('\n')) {
+      const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
+      if (m) env[m[1]] = m[2].replace(/^"|"$/g, '');
+    }
   }
+  for (const [k, v] of Object.entries(process.env)) if (/^(API_URL|ADMIN_TOKEN)_/.test(k) && v) env[k] = v;
   return env;
 }
 
@@ -24,7 +28,7 @@ export async function call(envName, action, payload = {}, { role = 'admin' } = {
   const E = envName.toUpperCase();
   const url = env[`API_URL_${E}`];
   const token = env[`${role === 'admin' ? 'ADMIN' : 'LEARNER'}_TOKEN_${E}`];
-  if (!url || !token) throw new Error(`API_URL_${E} or token missing in .env.local`);
+  if (!url || !token) throw new Error(`API_URL_${E} or token missing (.env.local or environment)`);
   const body = JSON.stringify({ ...payload, action, token });
   let lastErr;
   // Every action is idempotent, so a lost/garbled round-trip is simply retried.
