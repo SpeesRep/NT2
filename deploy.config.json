@@ -1,0 +1,10 @@
+{
+  "dev": {
+    "deploymentId": "AKfycbwPUPMjUfjLM_wObkYqkAgJ1zJS-NzZxltHBEf1XCB42fiPU__QezFdpYirctTHR18V",
+    "teacherDeploymentId": ""
+  },
+  "prod": {
+    "deploymentId": "AKfycbyGq2glsi3zBHFXKc9SZGNVCifyOr_GFobPn8V75YIIbj1a3Nq-93DJz4PaV2jZVIe3",
+    "teacherDeploymentId": ""
+  }
+}

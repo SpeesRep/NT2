@@ -4,13 +4,23 @@
 # and pushes it. Run setupProperties() once in the Apps Script editor, then: scripts/setup-properties.sh <env> --remove
 # The sheet ids (the speesrep@gmail.com copies, never Fanki's) are in sheets.json.
 set -eu
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.."; ROOT=$(pwd)
 ENV_LC=$1; ENV_UC=$(echo "$ENV_LC" | tr a-z A-Z)
 case $ENV_LC in dev|prod) ;; *) echo "dev or prod"; exit 1;; esac
 F=apps-script/SetupProperties.js
 if [ "${2:-}" = "--remove" ]; then
   rm -f "$F"
-  ./scripts/clasp.sh -P ".clasp.$ENV_LC.json" push -f 2>&1 | grep -v 'npm notice' | tail -1
+  # clasp 3.4.1 skips a push when the only change is a deleted file ("already up to date"), so push from a
+  # temporary copy with a one-line stamp in Secrets.gs; the next normal push restores the repo version.
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/speesrep-remove.XXXXXX"); trap 'rm -rf "$tmp"' EXIT
+  cp apps-script/*.gs apps-script/*.html apps-script/appsscript.json "$tmp/"
+  printf '\n// pushed %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$tmp/Secrets.gs"
+  printf '{"scriptId":"%s","rootDir":"."}\n' "$(node -p "require('./.clasp.$ENV_LC.json').scriptId")" > "$tmp/.clasp.json"
+  (cd "$tmp" && "$ROOT/scripts/clasp.sh" push -f 2>&1 | grep -v 'npm notice' | tail -1)
+  mkdir "$tmp/check" && cp "$tmp/.clasp.json" "$tmp/check/"
+  (cd "$tmp/check" && "$ROOT/scripts/clasp.sh" pull >/dev/null 2>&1)
+  if ls "$tmp/check" | grep -qi setupprop; then echo "SetupProperties is STILL on the server"; exit 1; fi
+  echo "SetupProperties removed from $ENV_UC"
   exit 0
 fi
 SHEET=$(node -p "require('./sheets.json').$ENV_UC")
