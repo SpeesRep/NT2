@@ -12,7 +12,7 @@ She sees **nl**. **fr** is hidden help: shown only in the "Hulp" panel and the o
 | `home.newToday` | nieuw vandaag | nouvelles cartes aujourd’hui |
 | `home.start` | Starten | Commencer |
 | `home.cards` | {n} kaarten | {n} cartes en tout |
-| `home.empty` | Nog geen kaarten. Tik op Synchroniseren. | Pas encore de cartes. Touche « Synchroniseren ». |
+| `home.empty` | Nog geen kaarten. Open het menu en tik op Bijwerken. | Pas encore de cartes. Ouvre le menu et touche « Bijwerken ». |
 | `home.emptyOffline` | Nog geen kaarten. Zet het internet aan. | Pas encore de cartes. Connecte-toi à internet. |
 | `home.allDone` | Klaar voor nu! | Fini pour le moment ! |
 | `home.later` | Volgende kaarten: {list} | Prochaines cartes aujourd’hui : {list} |
@@ -23,12 +23,11 @@ She sees **nl**. **fr** is hidden help: shown only in the "Hulp" panel and the o
 | `today.left1` | Nog 1 kaart | Encore 1 carte aujourd’hui |
 | `db.blocked` | SpeesRep is nog open in een ander venster. Sluit het en open de app opnieuw. | Une autre fenêtre de SpeesRep (ancienne version) est encore ouverte : ferme-la, puis rouvre l’appli. |
 | `status.offline` | Geen internet | Pas d’internet |
-| `sync.button` | Synchroniseren | Synchroniser (télécharger les cartes et envoyer tes réponses) |
-| `sync.running` | Synchroniseren… | Synchronisation en cours… |
-| `sync.error` | Geen verbinding. Probeer het opnieuw. | La synchronisation n’a pas marché. Réessaie plus tard. |
-| `sync.last` | Laatst gesynchroniseerd: {ago} | Dernière synchronisation : {ago} |
-| `sync.never` | Nog niet gesynchroniseerd | Pas encore synchronisé |
-| `sync.pending` | {n} antwoorden nog niet gesynchroniseerd | {n} réponses pas encore envoyées (elles partiront à la prochaine connexion) |
+| `sync.button` | Bijwerken | Mettre à jour (télécharger la nouvelle liste de mots ; rien n’est envoyé) |
+| `sync.running` | Bijwerken… | Mise à jour en cours… |
+| `sync.error` | Geen verbinding. Probeer het opnieuw. | La mise à jour n’a pas marché. Réessaie plus tard. |
+| `sync.last` | Bijgewerkt: {ago} | Liste de mots mise à jour : {ago} |
+| `sync.never` | Nog geen woorden | Pas encore de liste de mots |
 | `review.back` | Terug | Retour |
 | `review.show` | Antwoord tonen | Montrer la réponse |
 | `tags.title` | Kies een onderwerp | Choisis un ou plusieurs thèmes |
@@ -37,12 +36,12 @@ She sees **nl**. **fr** is hidden help: shown only in the "Hulp" panel and the o
 | `tags.locked` | nog dicht | pas encore ouvert : il s’ouvre quand le thème précédent est bien su |
 | `home.topicAll` | Onderwerp: alle | Thème : tous |
 | `home.topic` | Onderwerp: {list} | Thème : {list} |
-| `menu.open` | Menu openen | Ouvrir le menu (progression, cartes marquées, réglages, à propos, synchronisation) |
+| `menu.open` | Menu openen | Ouvrir le menu (progression, cartes marquées, réglages, à propos, mise à jour) |
 | `menu.title` | Menu | Menu |
 | `progress.title` | Voortgang | Ma progression |
 | `about.title` | Over SpeesRep | À propos de SpeesRep |
 | `about.intro` | SpeesRep helpt je om Nederlandse woorden te leren. Je oefent elke dag een beetje. | SpeesRep t’aide à apprendre des mots néerlandais. Tu t’exerces un peu chaque jour. |
-| `about.privacy` | Je voortgang blijft op dit toestel. SpeesRep heeft geen account nodig en vraagt niet om je naam of e-mailadres. | Ta progression reste sur cet appareil. SpeesRep n’a pas besoin de compte et ne demande ni ton nom ni ton e-mail. |
+| `about.privacy` | Je voortgang blijft op dit toestel. SpeesRep stuurt niets naar een server. Het haalt alleen de woordenlijst op. Geen account, geen naam, geen e-mailadres. | Ta progression reste sur cet appareil. SpeesRep n’envoie rien à un serveur : il télécharge seulement la liste de mots. Pas de compte, pas de nom, pas d’e-mail. |
 | `about.imagesTitle` | Plaatjes | Images |
 | `about.images` | Alle plaatjes zijn gemaakt door OpenMoji (https://openmoji.org/), het open-source emoji- en iconenproject. De plaatjes zijn niet aangepast. | Toutes les images viennent d’OpenMoji (https://openmoji.org/), un projet libre d’emojis et d’icônes. Elles ne sont pas modifiées. |
 | `about.license` | Licentie: CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/) | Licence : CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/) |
@@ -135,7 +134,7 @@ She sees **nl**. **fr** is hidden help: shown only in the "Hulp" panel and the o
 
 | screen | fr (shown in the panel) |
 |---|---|
-| home | Touche « SpeesRep » en haut pour le menu : « Voortgang » (ta progression) et « Gemarkeerd » (cartes marquées 🚩). Cet écran montre combien de cartes tu dois revoir aujourd’hui (« te herhalen ») et combien de nouvelles cartes t’attendent (« nieuw vandaag »). La barre « Vandaag » montre ton travail du jour ; « Nog 5 kaarten » = encore 5 cartes. Touche « Starten » pour commencer ; tu peux t’arrêter quand tu veux (« Terug »), tout est gardé. « Klaar voor nu! » = fini pour le moment ; « Volgende kaarten: 3 over ± 15 min » = 3 cartes reviennent dans environ 15 minutes ; elles arrivent alors dans « Vandaag » et « Starten » revient. L’appli fonctionne aussi sans internet : tes réponses sont gardées sur le téléphone et envoyées à la prochaine connexion. Dans le menu (touche « SpeesRep » en haut) : « Synchroniseren » télécharge les nouvelles cartes et envoie tes réponses quand tu as internet (ça se fait aussi tout seul). Chaque écran a sa propre page « Hulp » : touche « Hulp » là où tu es. |
+| home | Touche « SpeesRep » en haut pour le menu : « Voortgang » (ta progression) et « Gemarkeerd » (cartes marquées 🚩). Cet écran montre combien de cartes tu dois revoir aujourd’hui (« te herhalen ») et combien de nouvelles cartes t’attendent (« nieuw vandaag »). La barre « Vandaag » montre ton travail du jour ; « Nog 5 kaarten » = encore 5 cartes. Touche « Starten » pour commencer ; tu peux t’arrêter quand tu veux (« Terug »), tout est gardé. « Klaar voor nu! » = fini pour le moment ; « Volgende kaarten: 3 over ± 15 min » = 3 cartes reviennent dans environ 15 minutes ; elles arrivent alors dans « Vandaag » et « Starten » revient. L’appli fonctionne aussi sans internet : tes réponses restent sur le téléphone et ne sont jamais envoyées. Dans le menu (touche « SpeesRep » en haut) : « Bijwerken » télécharge la nouvelle liste de mots quand tu as internet (ça se fait aussi tout seul). Chaque écran a sa propre page « Hulp » : touche « Hulp » là où tu es. |
 | about | Cette page explique SpeesRep : à quoi sert l’appli, que ta progression reste sur ton téléphone (pas de compte, pas de nom, pas d’e-mail) et d’où viennent les images (OpenMoji, licence CC BY-SA 4.0). |
 | settings | Ces réglages restent sur ton téléphone. « Max. aantal nieuwe woorden per dag » = combien de nouveaux mots au maximum chaque jour (« Standaard » = le choix de ton professeur). « Luisteroefeningen » = parfois la carte commence seulement par le son ; « Uit » = jamais. « Antwoord voorlezen » = le téléphone lit la réponse néerlandaise à voix haute quand tu la montres. « Back-up opslaan » enregistre ta progression dans un fichier ; « Back-up terugzetten » la remet depuis ce fichier (par exemple sur un nouveau téléphone). Les changements comptent tout de suite, pour la prochaine carte. |
 | progress | Ta progression : « kaarten geoefend » = cartes déjà travaillées, « kaarten bekend » = cartes bien sues, « herhalingen deze week » = révisions des 7 derniers jours, « dagen op rij » = jours de suite. En bas : combien de cartes reviennent aujourd’hui (vandaag), demain (morgen) et cette semaine (deze week). |

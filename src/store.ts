@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import { allCards, allProgress, getMeta, getSettings, pendingCount } from './db';
+import { allCards, allProgress, getMeta, getSettings } from './db';
 import { DEFAULT_SETTINGS, type Card, type CurriculumRow, type Settings, type Tag } from './types';
 import type { Progress } from './scheduler';
 import { todaysDone, todaysRound, type DoneToday, type Round } from './today';
@@ -18,7 +18,6 @@ export type State = {
   sync: SyncStatus;
   progress: Map<string, Progress>;
   intro: Intro;
-  pending: number; // reviews not yet sent
   curriculum: CurriculumRow[];
   curriculumOpened: Record<string, string>; // topics that opened (latch)
   studyTags: string[];
@@ -41,7 +40,6 @@ let state: State = {
   sync: 'idle',
   progress: new Map(),
   intro: todaysIntro(undefined),
-  pending: 0,
   curriculum: [],
   curriculumOpened: {},
   studyTags: [],
@@ -81,14 +79,13 @@ export function byAdded(a: Card & { order?: number }, b: Card & { order?: number
 }
 
 export async function loadFromDb(): Promise<void> {
-  const [cards, settings, tags, lastSync, progress, intro, pending, curriculum, studyTags, doneToday, dayCounts, userSettings, round, curriculumOpened] = await Promise.all([
+  const [cards, settings, tags, lastSync, progress, intro, curriculum, studyTags, doneToday, dayCounts, userSettings, round, curriculumOpened] = await Promise.all([
     allCards(),
     getSettings(),
     getMeta('tags'),
     getMeta('lastSync'),
     allProgress(),
     getMeta('intro'),
-    pendingCount(),
     getMeta('curriculum'),
     getMeta('studyTags'),
     getMeta('doneToday'),
@@ -105,7 +102,6 @@ export async function loadFromDb(): Promise<void> {
     lastSync: lastSync ?? null,
     progress,
     intro: todaysIntro(intro),
-    pending,
     curriculum: curriculum ?? [],
     curriculumOpened: curriculumOpened ?? {},
     studyTags: studyTags ?? [],

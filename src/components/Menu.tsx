@@ -20,7 +20,7 @@ export function Menu({ go }: { go: (screen: 'progress' | 'marked' | 'settings' |
           <span class="menu-caret" aria-hidden="true">
             ▾
           </span>
-          {(s.flagsOpen > 0 || s.pending > 0) && <span class="menu-dot" aria-hidden="true" />}
+          {s.flagsOpen > 0 && <span class="menu-dot" aria-hidden="true" />}
         </h1>
       </button>
       {open && (

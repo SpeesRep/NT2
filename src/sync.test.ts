@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { cleanCard, cleanSettings } from './sync';
+import { CONTENT_URL, cleanCard, cleanSettings, parseContent } from './sync';
 import { _resetDb, allCards, getSettings, saveSnapshot } from './db';
 import { byAdded } from './store';
 import { dutchText, subjectFor, visibleFlags } from './display';
@@ -91,5 +91,33 @@ describe('badges shown to the learner', () => {
   it('"separable" (scheidbaar) stays in the data but is never shown; false-friend is', () => {
     expect(visibleFlags({ flags: ['separable'] })).toEqual([]);
     expect(visibleFlags({ flags: ['false-friend', 'separable'] })).toEqual(['false-friend']);
+  });
+});
+
+describe('parseContent (content.json)', () => {
+  const file = (over: Record<string, unknown> = {}) => ({
+    format: 1, version: 'abc123', env: 'DEV', generated_at: '2026-10-06T20:00:00Z',
+    cards: [raw(), raw({ id: 'c_2', nl: 'tafel', active: false })], settings: { new_per_day: 7 }, tags: [{ tag: 'household', label_nl: 'huis' }],
+    curriculum: [{ order: 1, tag: 'household', rule: 'always' }],
+    ...over
+  });
+  it('keeps the version and the active, cleaned cards', () => {
+    const c = parseContent(file());
+    expect(c.version).toBe('abc123');
+    expect(c.cards.map((x) => x.id)).toEqual(['c_1']);
+    expect(c.settings.new_per_day).toBe(7);
+    expect(c.curriculum[0]).toMatchObject({ tag: 'household', rule: 'always' });
+  });
+  it('refuses a file without a version or without cards', () => {
+    expect(() => parseContent(file({ version: '' }))).toThrow();
+    expect(() => parseContent(file({ cards: undefined }))).toThrow();
+    expect(() => parseContent(null)).toThrow();
+    expect(() => parseContent('<html>')).toThrow();
+  });
+});
+
+describe('CONTENT_URL', () => {
+  it('is relative to the app (same origin, no API host)', () => {
+    expect(CONTENT_URL).toBe('/content.json');
   });
 });

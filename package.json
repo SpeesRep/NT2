@@ -27,7 +27,7 @@
     "admin": "node scripts/admin.mjs",
     "ui-strings": "node scripts/ui-strings.mjs",
     "ui-vocab": "node scripts/check-ui-vocab.mjs",
-    "e2e:build": "SPEESREP_OUT_DIR=e2e-dist API_URL_DEV=https://mock.speesrep.test/exec LEARNER_TOKEN_DEV=e2e-token vite build --mode dev",
+    "e2e:build": "SPEESREP_OUT_DIR=e2e-dist vite build --mode dev",
     "backup:prod": "node scripts/backup.mjs prod",
     "openmoji": "node scripts/openmoji.mjs",
     "openmoji:check": "node scripts/check-openmoji.mjs"

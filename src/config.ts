@@ -1,6 +1,4 @@
-// Build-time configuration (see vite.config.ts). The learner token is public by design.
-export const API_URL = __API_URL__;
-export const LEARNER_TOKEN = __LEARNER_TOKEN__;
+// Build-time configuration (see vite.config.ts). The app talks to no server: it only fetches content.json from its own origin.
 export const APP_ENV = __APP_ENV__;
 export const BUILD_ID = __BUILD_ID__;
 /** Namespace for IndexedDB / localStorage: DEV and PROD share the github.io origin. */

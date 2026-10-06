@@ -54,8 +54,7 @@ describe('resume after stopping (done_today is stored with the rating)', () => {
   it('reopening the app the same day gives the same bar', async () => {
     const done: DoneToday = { date: '2026-10-04', items: { 'a|recog': 'due' } };
     const p = prog('a', at(3 * 1440));
-    await recordReview(p, { event_id: 'e1', card_id: 'a', track: 'recog', ts: now.toISOString(), rating: 3, mode: 'nl_fr', duration_ms: 1, snapshot: {} as never },
-      todaysIntro(undefined, now), done);
+    await recordReview(p, todaysIntro(undefined, now), done);
     _resetDb(); // app closed and reopened
     const stored = await getMeta('doneToday');
     expect(todayBar(todaysDone(stored, now), ['b|recog'])).toEqual({ done: 1, remaining: 1, fill: 0.5 });

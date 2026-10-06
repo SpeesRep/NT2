@@ -12,7 +12,7 @@ export const UI = {
   'home.newToday': { nl: 'nieuw vandaag', fr: 'nouvelles cartes aujourd’hui' },
   'home.start': { nl: 'Starten', fr: 'Commencer' },
   'home.cards': { nl: '{n} kaarten', fr: '{n} cartes en tout' },
-  'home.empty': { nl: 'Nog geen kaarten. Tik op Synchroniseren.', fr: 'Pas encore de cartes. Touche « Synchroniseren ».' },
+  'home.empty': { nl: 'Nog geen kaarten. Open het menu en tik op Bijwerken.', fr: 'Pas encore de cartes. Ouvre le menu et touche « Bijwerken ».' },
   'home.emptyOffline': { nl: 'Nog geen kaarten. Zet het internet aan.', fr: 'Pas encore de cartes. Connecte-toi à internet.' },
   'home.allDone': { nl: 'Klaar voor nu!', fr: 'Fini pour le moment !' },
   'home.later': { nl: 'Volgende kaarten: {list}', fr: 'Prochaines cartes aujourd’hui : {list}' },
@@ -29,12 +29,11 @@ export const UI = {
 
   // Status + sync
   'status.offline': { nl: 'Geen internet', fr: 'Pas d’internet' },
-  'sync.button': { nl: 'Synchroniseren', fr: 'Synchroniser (télécharger les cartes et envoyer tes réponses)' },
-  'sync.running': { nl: 'Synchroniseren…', fr: 'Synchronisation en cours…' },
-  'sync.error': { nl: 'Geen verbinding. Probeer het opnieuw.', fr: 'La synchronisation n’a pas marché. Réessaie plus tard.' },
-  'sync.last': { nl: 'Laatst gesynchroniseerd: {ago}', fr: 'Dernière synchronisation : {ago}' },
-  'sync.never': { nl: 'Nog niet gesynchroniseerd', fr: 'Pas encore synchronisé' },
-  'sync.pending': { nl: '{n} antwoorden nog niet gesynchroniseerd', fr: '{n} réponses pas encore envoyées (elles partiront à la prochaine connexion)' },
+  'sync.button': { nl: 'Bijwerken', fr: 'Mettre à jour (télécharger la nouvelle liste de mots ; rien n’est envoyé)' },
+  'sync.running': { nl: 'Bijwerken…', fr: 'Mise à jour en cours…' },
+  'sync.error': { nl: 'Geen verbinding. Probeer het opnieuw.', fr: 'La mise à jour n’a pas marché. Réessaie plus tard.' },
+  'sync.last': { nl: 'Bijgewerkt: {ago}', fr: 'Liste de mots mise à jour : {ago}' },
+  'sync.never': { nl: 'Nog geen woorden', fr: 'Pas encore de liste de mots' },
 
   // Review
   'review.back': { nl: 'Terug', fr: 'Retour' },
@@ -49,7 +48,7 @@ export const UI = {
   'home.topic': { nl: 'Onderwerp: {list}', fr: 'Thème : {list}' },
 
   // Menu (tap "SpeesRep")
-  'menu.open': { nl: 'Menu openen', fr: 'Ouvrir le menu (progression, cartes marquées, réglages, à propos, synchronisation)' },
+  'menu.open': { nl: 'Menu openen', fr: 'Ouvrir le menu (progression, cartes marquées, réglages, à propos, mise à jour)' },
   'menu.title': { nl: 'Menu', fr: 'Menu' },
 
   // Voortgang (progress overview)
@@ -62,8 +61,8 @@ export const UI = {
     fr: 'SpeesRep t’aide à apprendre des mots néerlandais. Tu t’exerces un peu chaque jour.'
   },
   'about.privacy': {
-    nl: 'Je voortgang blijft op dit toestel. SpeesRep heeft geen account nodig en vraagt niet om je naam of e-mailadres.',
-    fr: 'Ta progression reste sur cet appareil. SpeesRep n’a pas besoin de compte et ne demande ni ton nom ni ton e-mail.'
+    nl: 'Je voortgang blijft op dit toestel. SpeesRep stuurt niets naar een server. Het haalt alleen de woordenlijst op. Geen account, geen naam, geen e-mailadres.',
+    fr: 'Ta progression reste sur cet appareil. SpeesRep n’envoie rien à un serveur : il télécharge seulement la liste de mots. Pas de compte, pas de nom, pas d’e-mail.'
   },
   'about.imagesTitle': { nl: 'Plaatjes', fr: 'Images' },
   'about.images': {
@@ -181,9 +180,9 @@ export const HELP = {
       'cartes t’attendent (« nieuw vandaag »). La barre « Vandaag » montre ton travail du jour ; « Nog 5 kaarten » = ' +
       'encore 5 cartes. Touche « Starten » pour commencer ; tu peux t’arrêter quand tu veux (« Terug »), tout est ' +
       'gardé. « Klaar voor nu! » = fini pour le moment ; « Volgende kaarten: 3 over ± 15 min » = 3 cartes ' +
-      'reviennent dans environ 15 minutes ; elles arrivent alors dans « Vandaag » et « Starten » revient. L’appli fonctionne aussi sans internet : tes réponses sont gardées sur le téléphone ' +
-      'et envoyées à la prochaine connexion. Dans le menu (touche « SpeesRep » en haut) : « Synchroniseren » télécharge ' +
-      'les nouvelles cartes et envoie tes réponses quand tu as internet (ça se fait aussi tout seul). ' +
+      'reviennent dans environ 15 minutes ; elles arrivent alors dans « Vandaag » et « Starten » revient. L’appli fonctionne aussi sans internet : tes réponses restent sur le téléphone ' +
+      'et ne sont jamais envoyées. Dans le menu (touche « SpeesRep » en haut) : « Bijwerken » télécharge ' +
+      'la nouvelle liste de mots quand tu as internet (ça se fait aussi tout seul). ' +
       'Chaque écran a sa propre page « Hulp » : touche « Hulp » là où tu es.'
   },
   about: {

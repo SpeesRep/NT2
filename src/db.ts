@@ -7,7 +7,7 @@ import type { Intro, Mode } from './session';
 import type { DoneToday, Round } from './today';
 import type { UserSettings } from './userSettings';
 
-/** One review, as stored in the outbox and sent to the API (Log row). */
+/** One review event. SpeesRep no longer stores or sends these (no data collection); kept for old backups. */
 export type ReviewEvent = {
   event_id: string;
   card_id: string;
@@ -24,12 +24,13 @@ export type ReviewEvent = {
 //   cards    — every active card from the sheet (replaced on each pull)
 //   meta     — settings, tags, lastSync, doneToday …
 //   progress — FSRS state per card+track (stage 3)
-//   queue    — review events waiting to be pushed (stage 3/4)
+//   queue    — unused since SpeesRep (reviews never leave the device); kept so the schema needs no upgrade
 
 export type Meta = {
   settings: Settings;
   tags: Tag[];
-  lastSync: string; // ISO time of the last successful sync
+  lastSync: string; // ISO time of the last successful content check
+  contentVersion: string; // `version` of the stored content.json
   intro: Intro; // new cards introduced today
   curriculum: CurriculumRow[];
   curriculumOpened: Record<string, string>; // latch: tag → local date it opened (src/curriculum.ts)
@@ -153,15 +154,13 @@ export async function allProgress(): Promise<Map<string, Progress>> {
 }
 
 /**
- * Saves one review: new progress + outbox event + today's intro list (+ the item as done today when it left
- * the due window), in ONE transaction. Either all are stored or none, so a crash can never lose a review or
- * double-count it.
+ * Saves one review: new progress + today's intro list + the day count (+ the item as done today when it left
+ * the due window), in ONE transaction. Either all are stored or none. Nothing is queued for sending.
  */
-export async function recordReview(progress: Progress, event: ReviewEvent, intro: Intro, doneToday?: DoneToday, round?: Round): Promise<void> {
+export async function recordReview(progress: Progress, intro: Intro, doneToday?: DoneToday, round?: Round): Promise<void> {
   const d = await db();
-  const tx = d.transaction(['progress', 'queue', 'meta'], 'readwrite');
+  const tx = d.transaction(['progress', 'meta'], 'readwrite');
   await tx.objectStore('progress').put(progress);
-  await tx.objectStore('queue').put(event);
   await tx.objectStore('meta').put({ key: 'intro', value: intro });
   // Reviews per local day (for "Voortgang"), in the same transaction.
   const day = intro.date;
@@ -172,40 +171,4 @@ export async function recordReview(progress: Progress, event: ReviewEvent, intro
   if (doneToday) await tx.objectStore('meta').put({ key: 'doneToday', value: doneToday });
   if (round) await tx.objectStore('meta').put({ key: 'round', value: round });
   await tx.done;
-}
-
-export async function pendingEvents(): Promise<ReviewEvent[]> {
-  return (await db()).getAllFromIndex('queue', 'ts');
-}
-
-export async function pendingCount(): Promise<number> {
-  return (await db()).count('queue');
-}
-
-/** Removes events the server confirmed (accepted or already had). */
-export async function deleteEvents(ids: string[]): Promise<void> {
-  const tx = (await db()).transaction('queue', 'readwrite');
-  for (const id of ids) await tx.store.delete(id);
-  await tx.done;
-}
-
-/**
- * Merges Progress from the server. The server row wins only if it is newer than ours AND we have no
- * unsent review for that card+track (our own pending review is always the latest truth).
- */
-export async function mergeServerProgress(rows: Progress[]): Promise<number> {
-  const d = await db();
-  const tx = d.transaction(['progress', 'queue'], 'readwrite');
-  const pending = new Set((await tx.objectStore('queue').getAll()).map((e) => `${e.card_id}|${e.track}`));
-  let changed = 0;
-  for (const row of rows) {
-    if (pending.has(row.key)) continue;
-    const local = await tx.objectStore('progress').get(row.key);
-    if (!local || (row.last_review || '') > (local.last_review || '')) {
-      await tx.objectStore('progress').put(row);
-      changed++;
-    }
-  }
-  await tx.done;
-  return changed;
 }

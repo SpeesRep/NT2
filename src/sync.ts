@@ -1,13 +1,11 @@
-import { apiGet, apiPost } from './api';
-import { deleteEvents, mergeServerProgress, pendingCount, pendingEvents, saveSnapshot, setMeta } from './db';
-import { progressKey, type Progress, type StateName, type Track } from './scheduler';
+import { getMeta, saveSnapshot, setMeta } from './db';
 import { setUiSettings } from './prefs';
 import { getState, loadFromDb, setState } from './store';
 import { DEFAULT_SETTINGS, type Card, type CardsResponse, type CurriculumRow, type Settings } from './types';
 
 const TYPES = new Set(['word', 'oneway', 'sentence', 'question']);
 
-/** Defensive copy of a card from the API (the sheet is hand-edited). */
+/** Defensive copy of a card from content.json (the sheet is hand-edited). */
 export function cleanCard(raw: Partial<Card>, order: number): (Card & { order: number }) | null {
   if (!raw || !raw.id || !raw.nl) return null;
   const list = (v: unknown) => (Array.isArray(v) ? v.map(String).map((s) => s.trim()).filter(Boolean) : []);
@@ -67,80 +65,59 @@ export function cleanCurriculum(raw: unknown): CurriculumRow[] {
     .filter((r) => r.tag || r.rule);
 }
 
-const PUSH_BATCH = 200;
+/** The word list, published by the content Action next to the app (same origin, never an external host). */
+export const CONTENT_URL = `${import.meta.env.BASE_URL}content.json`;
 
-/**
- * Sends queued reviews. Events leave the queue only after the server confirms them (accepted or
- * duplicate), so an interrupted push is simply repeated next time; the server ignores event_ids it has.
- */
-export async function pushQueue(): Promise<number> {
-  let sent = 0;
-  for (;;) {
-    const batch = (await pendingEvents()).slice(0, PUSH_BATCH);
-    if (!batch.length) return sent;
-    const res = await apiPost<{ accepted: string[]; duplicate: string[]; rejected: { event_id: string }[] }>('reviews', { events: batch });
-    const done = [...res.accepted, ...res.duplicate, ...res.rejected.map((r) => r.event_id).filter(Boolean)];
-    if (res.rejected.length) console.warn('rejected review events', res.rejected);
-    await deleteEvents(done);
-    sent += res.accepted.length;
-    if (done.length < batch.length) return sent; // server left some unconfirmed: try again next sync
+export type Content = {
+  version: string;
+  cards: (Card & { order: number })[];
+  settings: Settings;
+  tags: CardsResponse['tags'];
+  curriculum: CurriculumRow[];
+};
+
+/** Validates content.json (written by scripts/build-content.mjs). Throws on anything that is not a word list. */
+export function parseContent(raw: unknown): Content {
+  const r = raw as Partial<CardsResponse> & { version?: unknown };
+  if (!r || typeof r !== 'object' || typeof r.version !== 'string' || !r.version || !Array.isArray(r.cards)) {
+    throw new Error('bad content.json');
   }
-}
-
-export function cleanProgress(raw: Record<string, unknown>): Progress | null {
-  const card_id = String(raw.card_id ?? '');
-  const track = raw.track === 'prod' ? 'prod' : raw.track === 'recog' ? 'recog' : null;
-  const due = String(raw.due ?? '');
-  if (!card_id || !track || isNaN(Date.parse(due))) return null;
-  const states: StateName[] = ['New', 'Learning', 'Review', 'Relearning'];
-  const state = states.includes(raw.state as StateName) ? (raw.state as StateName) : 'Review';
   return {
-    key: progressKey(card_id, track as Track),
-    card_id,
-    track: track as Track,
-    state,
-    due: new Date(due).toISOString(),
-    stability: Number(raw.stability) || 0,
-    difficulty: Number(raw.difficulty) || 0,
-    reps: Number(raw.reps) || 0,
-    lapses: Number(raw.lapses) || 0,
-    last_review: raw.last_review ? new Date(String(raw.last_review)).toISOString() : '',
-    learning_steps: Number(raw.learning_steps) || 0,
-    scheduled_days: Number(raw.scheduled_days) || 0
+    version: r.version,
+    cards: r.cards.map(cleanCard).filter((c): c is Card & { order: number } => !!c && c.active),
+    settings: cleanSettings(r.settings),
+    tags: (Array.isArray(r.tags) ? r.tags : []).filter((t) => t && t.tag),
+    curriculum: cleanCurriculum(r.curriculum)
   };
 }
 
 let running: Promise<boolean> | null = null;
 
-/** Push reviews, then pull cards + settings + her Progress. Returns true on success. Never throws. */
+/**
+ * Fetches content.json from the app's own origin and stores it when its `version` is new. Nothing is ever
+ * sent: progress stays on this device. Returns true on success. Never throws.
+ */
 export function syncNow(): Promise<boolean> {
   if (running) return running;
   running = (async () => {
     if (!navigator.onLine) return false;
     setState({ sync: 'syncing' });
     try {
-      await pushQueue();
-      const [res, state] = await Promise.all([
-        apiGet<CardsResponse>('cards'),
-        apiGet<{ progress: Record<string, unknown>[] }>('state')
-      ]);
-      const cards = res.cards.map(cleanCard).filter((c): c is Card & { order: number } => !!c && c.active);
-      const settings = cleanSettings(res.settings);
-      await saveSnapshot(cards, {
-        settings,
-        tags: (res.tags ?? []).filter((t) => t && t.tag),
-        curriculum: cleanCurriculum(res.curriculum)
-      });
-      await mergeServerProgress(state.progress.map(cleanProgress).filter((p): p is Progress => !!p));
-      await pushQueue(); // anything reviewed while we were pulling
+      const res = await fetch(CONTENT_URL, { cache: 'no-cache' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const content = parseContent(await res.json());
+      if (content.version !== (await getMeta('contentVersion'))) {
+        await saveSnapshot(content.cards, { settings: content.settings, tags: content.tags, curriculum: content.curriculum });
+        await setMeta('contentVersion', content.version);
+      }
       await setMeta('lastSync', new Date().toISOString());
-      setUiSettings({ show_french_help: settings.show_french_help });
+      setUiSettings({ show_french_help: content.settings.show_french_help });
       await loadFromDb();
       setState({ sync: 'ok' });
       return true;
     } catch (e) {
-      console.warn('sync failed', e);
-      setState({ sync: 'error', pending: await pendingCount().catch(() => 0) });
+      console.warn('content update failed', e);
+      setState({ sync: 'error' });
       return false;
     } finally {
       running = null;

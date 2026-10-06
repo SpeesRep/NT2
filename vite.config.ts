@@ -1,23 +1,35 @@
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig } from 'vite';
 import preact from '@preact/preset-vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 // Two builds from one codebase:
 //   --mode prod → base /NT2/      → dist/
 //   --mode dev  → base /NT2/dev/  → dist/dev/   (built second, emptyOutDir false)
-// API_URL_<ENV> comes from .env.local locally and from GitHub Actions secrets in CI.
-// SpeesRep has no learner token (LEARNER_TOKEN_<ENV> is optional and normally empty).
+// The app calls no API: it fetches content.json from its own origin (published by .github/workflows/content.yml).
+// A Content-Security-Policy meta tag (production builds only; the dev server needs inline HMR scripts) limits
+// every fetch to that origin.
+/** No external origins: scripts, styles, pictures, the worker and every fetch (content.json) come from this site. */
+export const CSP = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self'",
+  "img-src 'self' data: blob:",
+  "font-src 'self'",
+  "connect-src 'self'",
+  "manifest-src 'self'",
+  "worker-src 'self'",
+  "media-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'none'"
+].join('; ');
+
 export default defineConfig(({ mode, command }) => {
   const isProd = mode === 'prod';
   const ENV = isProd ? 'PROD' : 'DEV';
-  const env = { ...loadEnv(mode, process.cwd(), ''), ...process.env };
   const base = process.env.SPEESREP_BASE ?? (isProd ? '/NT2/' : '/NT2/dev/');
   const name = isProd ? 'SpeesRep' : 'SpeesRep DEV';
   const iconDir = isProd ? 'icons/prod' : 'icons/dev';
-
-  if (command === 'build' && !process.env.SPEESREP_ALLOW_NO_API && !env[`API_URL_${ENV}`]) {
-    throw new Error(`API_URL_${ENV} missing (set in .env.local or CI secrets)`);
-  }
 
   return {
     base,
@@ -26,7 +38,10 @@ export default defineConfig(({ mode, command }) => {
       {
         name: 'speesrep-html',
         transformIndexHtml: (html: string) =>
-          html.replaceAll('%APP_NAME%', name).replaceAll('%ICON_DIR%', `${base}${iconDir}`)
+          html
+            .replaceAll('%APP_NAME%', name)
+            .replaceAll('%ICON_DIR%', `${base}${iconDir}`)
+            .replace('<!-- %CSP% -->', command === 'build' ? `<meta http-equiv="Content-Security-Policy" content="${CSP}" />` : '')
       },
       VitePWA({
         registerType: 'prompt',
@@ -63,8 +78,6 @@ export default defineConfig(({ mode, command }) => {
       })
     ],
     define: {
-      __API_URL__: JSON.stringify(env[`API_URL_${ENV}`] ?? ''),
-      __LEARNER_TOKEN__: JSON.stringify(env[`LEARNER_TOKEN_${ENV}`] ?? ''),
       __APP_ENV__: JSON.stringify(ENV),
       __BUILD_ID__: JSON.stringify(process.env.SPEESREP_BUILD_ID ?? new Date().toISOString().slice(0, 16))
     },

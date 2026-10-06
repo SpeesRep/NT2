@@ -1,7 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// End-to-end test of the offline flow against a DEV build whose API URL points to a mock
-// (intercepted with page.route in the test). Build: `npm run e2e` does it.
+// End-to-end test of the offline flow against a DEV build; content.json is mocked with context.route in the test. Build: `npm run e2e` does it.
 export default defineConfig({
   testDir: 'e2e',
   timeout: 60_000,

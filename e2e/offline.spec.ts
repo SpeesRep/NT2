@@ -1,77 +1,70 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 
-// A fake Apps Script: the app build points at https://mock.speesrep.test/exec (see `npm run e2e`).
-const API = 'https://mock.speesrep.test/exec';
-
-type Event = { event_id: string; card_id: string; rating: number };
+// The app's only network use: content.json from its own origin (published by the content Action).
+const ORIGIN = 'http://localhost:4174';
+const CONTENT = `${ORIGIN}/NT2/dev/content.json`;
 
 function mockServer(
   settings: Record<string, unknown> = { new_per_day: 5, show_french_help: true },
   extraCards: Record<string, unknown>[] = []
 ) {
-  const log = new Map<string, Event>();
-  let posts = 0;
-  let loseNextReply = false;
+  let version = 1;
+  let fetches = 0;
   const cards = ['huis', 'tafel', 'stoel', 'raam', 'boek'].map((nl, i) => ({
     id: `c_${i}`, type: 'word', nl, article: 'de', pos: 'noun', fr: `fr-${nl}`, example_nl: '', example_fr: '',
     tags: i < 2 ? ['huishouden'] : ['reizen'], flags: [], added: '2026-09-27', active: true
   }));
   cards.unshift(...(extraCards as typeof cards));
-  const json = (route: Route, body: unknown) =>
-    route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body) });
+  /** Every request the page or its service worker makes (method + URL). */
+  const requests: { method: string; url: string }[] = [];
 
   return {
-    log,
-    posts: () => posts,
-    loseNextReply: () => (loseNextReply = true),
+    fetches: () => fetches,
+    requests,
+    /** A new word list is published (new version). */
+    publish(card: (typeof cards)[number]) {
+      cards.push(card);
+      version++;
+    },
     async install(page: Page) {
-      await page.context().route(`${API}**`, async (route) => {
-        const req = route.request();
-        const url = new URL(req.url());
-        if (req.method() === 'GET') {
-          const action = url.searchParams.get('action');
-          if (action === 'ping') return json(route, { ok: true, env: 'DEV' });
-          if (action === 'state') return json(route, { ok: true, progress: [] });
-          return json(route, {
-            ok: true, env: 'DEV', serverTime: new Date().toISOString(), cards,
-            settings,
+      page.context().on('request', (r) => requests.push({ method: r.method(), url: r.url() }));
+      await page.context().route(CONTENT, async (route: Route) => {
+        fetches++;
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            format: 1, version: `v${version}`, env: 'DEV', generated_at: new Date().toISOString(), cards, settings,
             tags: [
               { tag: 'huishouden', label_nl: 'huishouden', label_fr: 'la maison' },
               { tag: 'reizen', label_nl: 'reizen', label_fr: 'voyages' },
               { tag: 'emoji', label_nl: 'emoji', label_fr: 'emoji', subject_nl: 'Wat is dit?' }
             ],
             curriculum: ['emoji', 'huishouden', 'reizen'].map((tag, i) => ({ order: i + 1, tag, rule: 'always', date: '', percentage: null, from_tags: [] }))
-          });
-        }
-        posts++;
-        const body = JSON.parse(req.postData() || '{}');
-        const accepted: string[] = [];
-        const duplicate: string[] = [];
-        for (const e of body.events as Event[]) {
-          if (log.has(e.event_id)) duplicate.push(e.event_id);
-          else {
-            log.set(e.event_id, e);
-            accepted.push(e.event_id);
-          }
-        }
-        if (loseNextReply) {
-          loseNextReply = false; // stored, but the phone never hears back (Google error page)
-          return route.fulfill({ status: 200, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<html>oops</html>' });
-        }
-        return json(route, { ok: true, accepted, duplicate, rejected: [] });
+          })
+        });
       });
     }
   };
 }
 
-/** The sync status lives in the menu: open it, run the checks, close it. */
+/** Fails the test on any Content-Security-Policy violation. */
+function watchCsp(page: Page) {
+  const violations: string[] = [];
+  page.on('console', (m) => {
+    if (/Content Security Policy/i.test(m.text())) violations.push(m.text());
+  });
+  return violations;
+}
+
+/** The word-list status lives in the menu: open it, run the checks, close it. */
 async function inMenu(page: Page, check: () => Promise<void>) {
   await page.getByRole('button', { name: 'Menu openen' }).click();
   await check();
   await page.getByRole('menu').getByRole('button', { name: 'Sluiten' }).click();
 }
 const waitSynced = (page: Page) =>
-  inMenu(page, () => expect(page.getByText('Laatst gesynchroniseerd: zojuist')).toBeVisible({ timeout: 20_000 }));
+  inMenu(page, () => expect(page.getByText('Bijgewerkt: zojuist')).toBeVisible({ timeout: 20_000 }));
 
 /** Rates n cards 😎 Makkelijk (days away: each one leaves today's queue). */
 async function rateEasy(page: Page, n: number) {
@@ -92,17 +85,19 @@ async function reviewCards(page: Page, n: number) {
   }
 }
 
-test('offline: review without internet, reconnect, every review reaches the server exactly once', async ({ page, context }) => {
+test('offline: review without internet, nothing is ever sent, a new word list arrives in the background', async ({ page, context }) => {
   const server = mockServer();
+  const csp = watchCsp(page);
   await server.install(page);
 
-  // 1. First launch online: cards are downloaded and the service worker caches the app.
+  // 1. First launch online: content.json is downloaded and the service worker caches the app.
   await page.goto('/NT2/dev/');
   await inMenu(page, async () => {
-    await expect(page.getByText('Laatst gesynchroniseerd: zojuist')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText('Bijgewerkt: zojuist')).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText('· 5 kaarten')).toBeVisible();
   });
   await page.evaluate(() => navigator.serviceWorker.ready);
+  expect(server.fetches()).toBeGreaterThanOrEqual(1);
 
   // 2. No internet, and the app is reopened: it still loads, with the cards.
   await context.setOffline(true);
@@ -110,35 +105,27 @@ test('offline: review without internet, reconnect, every review reaches the serv
   await expect(page.getByText('Geen internet').first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Starten' })).toBeEnabled();
 
-  // 3. Review 3 cards offline.
+  // 3. Review 3 cards offline. Nothing waits to be sent: no red dot on the menu.
   await page.getByRole('button', { name: 'Starten' }).click();
   await reviewCards(page, 3);
   await page.getByRole('button', { name: /Terug/ }).click();
-  // Unsent answers: the red dot on the menu title; the menu shows them (it stays open while the connection comes back).
-  await expect(page.locator('.menu-dot')).toBeVisible();
-  await page.getByRole('button', { name: 'Menu openen' }).click();
-  await expect(page.getByText('3 antwoorden nog niet gesynchroniseerd')).toBeVisible();
-  expect(server.log.size).toBe(0);
+  await expect(page.locator('.menu-dot')).toBeHidden();
 
-  // 4. Internet is back: the queue is pushed, and the first reply gets lost on the way.
-  server.loseNextReply();
+  // 4. A new word list is published; internet comes back: the app picks it up by itself.
+  server.publish({
+    id: 'c_new', type: 'word', nl: 'deur', article: 'de', pos: 'noun', fr: 'la porte', example_nl: '', example_fr: '',
+    tags: ['huishouden'], flags: [], added: '2026-09-28', active: true
+  });
   await context.setOffline(false);
-  await expect(page.getByText('3 antwoorden nog niet gesynchroniseerd')).toBeHidden({ timeout: 20_000 });
-  await expect(page.getByText('Laatst gesynchroniseerd: zojuist')).toBeVisible();
+  await inMenu(page, () => expect(page.getByText('· 6 kaarten')).toBeVisible({ timeout: 20_000 }));
 
-  // The resend after the lost reply was de-duplicated: 3 reviews, each exactly once.
-  expect(server.posts()).toBeGreaterThanOrEqual(2);
-  expect(server.log.size).toBe(3);
-  expect([...server.log.values()].every((e) => e.rating === 3)).toBe(true);
-
-  // 5. Another sync (the button in the menu) sends nothing new.
-  await page.getByRole('button', { name: 'Synchroniseren' }).click();
-  await expect(page.getByText('Laatst gesynchroniseerd: zojuist')).toBeVisible();
-  expect(server.log.size).toBe(3);
+  // 5. "Bijwerken" with the same version keeps the cards and the progress.
+  await page.getByRole('button', { name: 'Menu openen' }).click();
+  await page.getByRole('button', { name: 'Bijwerken' }).click();
+  await expect(page.getByText('Bijgewerkt: zojuist')).toBeVisible();
   await page.getByRole('menu').getByRole('button', { name: 'Sluiten' }).click();
-  await expect(page.locator('.menu-dot')).toBeHidden(); // everything sent, no 🚩 → no dot
 
-  // 6. Reviews and progress survive a restart.
+  // 6. Progress survives a restart; the old outbox stays empty.
   await page.reload();
   const stored = await page.evaluate(
     () =>
@@ -153,6 +140,11 @@ test('offline: review without internet, reconnect, every review reaches the serv
       })
   );
   expect(stored).toEqual({ progress: 3, queue: 0 });
+
+  // No data collection: only GET requests, all to the app's own origin.
+  expect(server.requests.length).toBeGreaterThan(0);
+  expect(server.requests.filter((r) => !r.url.startsWith(ORIGIN) || r.method !== 'GET')).toEqual([]);
+  expect(csp).toEqual([]);
 });
 
 test("topics, the Vandaag bar, stop and resume, and Klaar voor nu (no sessions, no timers)", async ({ page }) => {

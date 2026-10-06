@@ -3,7 +3,6 @@ import { APP_ENV, BUILD_ID } from './config';
 import { useOnline } from './pwa';
 import { t } from './i18n';
 import { getState, loadFromDb, setState, useStore } from './store';
-import { schedulePush } from './review';
 import { syncNow } from './sync';
 import { UpdateBanner } from './components/Banners';
 import { HelpButton } from './components/Help';
@@ -45,8 +44,7 @@ export function App() {
   }, []);
   useEffect(() => {
     if (!online || !s.loaded) return;
-    if (screen.name === 'home') void syncNow();
-    else schedulePush(0); // during review: just send the queued reviews
+    if (screen.name === 'home') void syncNow(); // during review: wait, the new word list can come later
   }, [online]);
   // Coming back to the app (it stays alive in the background on iOS): recompute today's work (no timers),
   // and refresh from the sheet if the last sync is old.
