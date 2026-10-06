@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<?!= include_('TeacherStyle') ?>
+</head>
+<body class="has-savebar">
+<script>var CTX = <?!= ctx ?>;</script>
+<?!= include_('TeacherStrings') ?>
+<?!= include_('TeacherNav') ?>
+<?!= include_('CurriculumLogic') ?>
+<main>
+  <h1 id="title"></h1>
+  <div class="hint" id="hint" hidden></div>
+  <div id="list"><p class="empty" id="loading"></p></div>
+  <h2 class="sec" id="newTitle"></h2>
+  <p class="meta" id="newText"></p>
+  <div class="topic newtopic">
+    <label><span id="newLabelL"></span><br><input id="newLabel" type="text" maxlength="40"></label>
+    <label><span id="newFrL"></span><br><input id="newFr" type="text" maxlength="40"></label>
+    <p class="meta"><span id="newKeyL"></span>: <code id="newKey">—</code></p>
+    <button class="btn" type="button" id="newAdd"></button>
+  </div>
+  <div class="savebar">
+    <button class="btn primary" id="save"></button>
+    <button class="btn" id="reload"></button>
+    <button class="btn" id="undo" hidden></button>
+    <span class="notice" id="notice" role="status"></span>
+  </div>
+</main>
+<script>
+var E = { labels: {}, rows: [], tags: {}, tagList: [], version: '', today: '', scores: null, known: null, hasBackup: false, openIdx: -1,
+          checks: null, dirty: false, busy: false };
+var $ = function (id) { return document.getElementById(id); };
+function run(fn) {
+  var args = [].slice.call(arguments, 1);
+  return new Promise(function (resolve, reject) {
+    google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[fn].apply(null, args);
+  });
+}
+function el(tag, attrs, kids) {
+  var n = document.createElement(tag);
+  Object.keys(attrs || {}).forEach(function (k) {
+    if (k === 'text') n.textContent = attrs[k];
+    else if (k.slice(0, 2) === 'on') n.addEventListener(k.slice(2), attrs[k]);
+    else n.setAttribute(k, attrs[k]);
+  });
+  (kids || []).forEach(function (c) { if (c) n.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+  return n;
+}
+function notice(text, kind) { var n = $('notice'); n.textContent = text || ''; n.className = 'notice' + (kind ? ' ' + kind : ''); }
+function cardsText(n) { return n === 1 ? tr('cur.card') : tr('cur.cards', { n: n }); }
+function label(tag) { var t = E.tags[tag]; return t ? t.label : tag; }
+function changed() { E.dirty = true; E.checks = null; notice(tr('cur.dirty')); render(); }
+function apply(res) {
+  E.rows = res.rows;
+  if (res.dropped.length) alert(tr('cur.dropped', { list: res.dropped.join('; ') }));
+}
+
+/** Verwijderen: first count (dry run) and ask, then delete the subject everywhere and reload. */
+function deleteTopic(tag) {
+  if (E.dirty) { alert(tr('cur.delete.saveFirst')); return; }
+  run('curriculumEditorDeleteTopic', tag, E.version, true).then(function (r) {
+    if (r.conflict) { notice(tr('cur.conflict'), 'bad'); return; }
+    var lines = [tr('cur.delete.q', { tag: label(tag) }), tr('cur.delete.cards', { n: r.cards })];
+    if (r.toInbox) lines.push(tr('cur.delete.toInbox', { n: r.toInbox }) + (r.studiedToInbox ? ' ' + tr('cur.delete.studied', { n: r.studiedToInbox }) : ''));
+    if (r.inbox) lines.push(tr('cur.delete.inbox', { n: r.inbox }));
+    if (r.waiting.length) lines.push(tr('cur.delete.waiting', { list: r.waiting.map(label).join(', ') }));
+    lines.push(tr('cur.delete.final'));
+    if (!confirm(lines.join('\n'))) return;
+    return run('curriculumEditorDeleteTopic', tag, E.version, false).then(function (res) {
+      if (res.conflict) { notice(tr('cur.conflict'), 'bad'); return; }
+      return load().then(function () { notice(tr('cur.delete.done', { tag: tag }), 'ok'); });
+    });
+  }).catch(function (e) { notice((e && e.message) || String(e), 'bad'); });
+}
+
+/** The open editor follows its topic when two rows swap. */
+function follow(i, dir) { if (E.openIdx === i) E.openIdx = i + dir; else if (E.openIdx === i + dir) E.openIdx = i; }
+
+function load() {
+  E.busy = true; $('loading') && ($('loading').textContent = tr('cur.loading'));
+  return run('curriculumEditorLoad').then(function (d) {
+    E.rows = d.rows.map(function (r) { return { tag: r.tag, rule: r.rule, date: r.date, percentage: r.percentage, from_tags: r.from_tags }; });
+    E.tags = {}; d.tags.forEach(function (t) { E.tags[t.tag] = t; });
+    E.tagList = d.tags; E.version = d.version; E.today = d.today; E.scores = d.scores; E.known = d.known; E.hasBackup = d.hasBackup;
+    E.openIdx = -1; E.checks = null; E.dirty = false; E.busy = false; E.labels = {};
+    notice('');
+    // Subjects that had no row were added (as Dicht) by the server while loading: just say so.
+    if (d.added && d.added.length) notice(tr('cur.missing', { list: d.added.map(label).join(', ') }), 'ok');
+    render();
+  }, function (e) { E.busy = false; alert((e && e.message) || e); });
+}
+
+function ruleEditor(row, i) {
+  var box = el('div', { 'class': 'ed' });
+  // The subject's name as the student sees it (Tags.label_nl). The code (tag) stays, so cards keep their subject.
+  var t = E.tags[row.tag];
+  if (t) {
+    var nameIn = el('input', { type: 'text', maxlength: '40', value: t.label, 'data-k': 'label' });
+    nameIn.addEventListener('input', function () { t.label = nameIn.value; E.labels[row.tag] = nameIn.value; E.dirty = true; E.checks = null; notice(tr('cur.dirty')); });
+    nameIn.addEventListener('change', function () { render(); });
+    box.appendChild(el('label', {}, [tr('cur.field.label'), el('br'), nameIn]));
+  }
+  var name = 'rule' + i;
+  ['always', 'date', 'known', 'closed'].forEach(function (rule) {
+    var input = el('input', { type: 'radio', name: name, value: rule });
+    if (row.rule === rule) input.checked = true;
+    input.addEventListener('change', function () { E.rows[i] = CurLogic.setRule(row, rule); changed(); });
+    box.appendChild(el('label', { 'class': 'r' }, [input, tr('cur.rule.' + rule)]));
+  });
+  if (row.rule === 'date') {
+    var d = el('input', { type: 'date', value: row.date || '' });
+    d.addEventListener('change', function () { E.rows[i].date = d.value; changed(); });
+    box.appendChild(el('label', {}, [tr('cur.field.date') + ' ', d]));
+  }
+  if (row.rule === 'known') {
+    var p = el('input', { type: 'number', min: '1', max: '100', step: '1', value: row.percentage === null ? '' : String(row.percentage), style: 'width:90px' });
+    p.addEventListener('change', function () { E.rows[i].percentage = p.value === '' ? null : Number(p.value); changed(); });
+    box.appendChild(el('label', {}, [tr('cur.field.pct') + ' ', p, ' %']));
+    var cand = CurLogic.candidates(E.rows, i);
+    box.appendChild(el('div', { 'class': 'meta', text: tr('cur.field.from') }));
+    if (!cand.length) box.appendChild(el('div', { 'class': 'meta', text: tr('cur.field.fromNone') }));
+    var chips = el('div', { 'class': 'chips' });
+    cand.forEach(function (t) {
+      var on = row.from_tags.indexOf(t) !== -1;
+      chips.appendChild(el('span', { 'class': 'chip' + (on ? ' on' : ''), role: 'checkbox', 'aria-checked': String(on), tabindex: '0', text: label(t),
+        onclick: function () {
+          var f = E.rows[i].from_tags, k = f.indexOf(t);
+          if (k === -1) f.push(t); else f.splice(k, 1);
+          changed();
+        } }));
+    });
+    box.appendChild(chips);
+  }
+  return box;
+}
+
+function render() {
+  $('title').textContent = tr('cur.title');
+  $('save').textContent = tr('cur.save'); $('reload').textContent = tr('cur.reload'); $('undo').textContent = tr('cur.undo');
+  $('undo').hidden = !E.hasBackup;
+  $('save').disabled = E.busy;
+  if (E.known && !$('knownInfo')) {
+    // "Bekend = …" (values from Settings) goes into the ⓘ panel, under the other instructions.
+    var ul = document.querySelector('#infoBody ul');
+    if (ul) ul.appendChild(el('li', { id: 'knownInfo', text: tr('cur.known', { days: E.known.known_stability_days, reviews: E.known.known_min_reviews }) }));
+  }
+  $('newTitle').textContent = tr('cur.new.title'); $('newText').textContent = tr('cur.new.text');
+  $('newLabelL').textContent = tr('cur.new.label'); $('newFrL').textContent = tr('cur.new.fr');
+  $('newKeyL').textContent = tr('cur.new.key'); $('newAdd').textContent = tr('cur.new.add');
+  var list = $('list'); list.innerHTML = '';
+  if (!E.version) { list.appendChild(el('p', { 'class': 'empty', id: 'loading', text: tr('cur.loading') })); return; }
+  E.rows.forEach(function (row, i) {
+    var t = E.tags[row.tag] || { label: row.tag, cards: 0 };
+    var check = E.checks && E.checks[i];
+    var tools = el('div', { 'class': 'tools' }, [
+      el('button', { 'class': 'btn', type: 'button', text: tr('cur.up'), onclick: function (e) { e.stopPropagation(); apply(CurLogic.move(E.rows, i, -1)); follow(i, -1); changed(); } }),
+      el('button', { 'class': 'btn', type: 'button', text: tr('cur.down'), onclick: function (e) { e.stopPropagation(); apply(CurLogic.move(E.rows, i, 1)); follow(i, 1); changed(); } }),
+      el('button', { 'class': 'btn bad', type: 'button', text: tr('cur.delete'), onclick: function (e) { e.stopPropagation(); deleteTopic(row.tag); } })
+    ]);
+    if (i === 0) tools.children[0].disabled = true;
+    if (i === E.rows.length - 1) tools.children[1].disabled = true;
+    var head = el('div', { 'class': 'head', role: 'button', tabindex: '0', 'aria-expanded': String(E.openIdx === i),
+      onclick: function () { E.openIdx = E.openIdx === i ? -1 : i; render(); } }, [
+      el('span', { 'class': 'num', text: String(i + 1) }),
+      el('div', {}, [
+        el('div', {}, [el('span', { 'class': 'name', text: t.label }), ' · ', el('span', { 'class': 'meta', text: cardsText(t.cards) })]),
+        el('div', { 'class': 'rule', text: CurLogic.sentence(row, tr) }),
+        el('div', { 'class': 'prev', text: CurLogic.preview(row, { today: E.today, scores: E.scores }, tr) })
+      ]),
+      tools
+    ]);
+    var box = el('div', { 'class': 'topic' + (E.openIdx === i ? ' open-ed' : '') }, [head]);
+    if (check && check.errors.length) box.classList.add('has-err');
+    if (check) {
+      check.errors.forEach(function (m) { box.appendChild(el('div', { 'class': 'msg-err', text: '⚠ ' + m })); });
+      check.warnings.forEach(function (m) { box.appendChild(el('div', { 'class': 'msg-warn', text: m })); });
+    }
+    if (E.openIdx === i) box.appendChild(ruleEditor(row, i));
+    list.appendChild(box);
+  });
+}
+
+$('save').addEventListener('click', function () {
+  var empty = Object.keys(E.labels).filter(function (k) { return !String(E.labels[k]).trim(); });
+  if (empty.length) { notice(tr('cur.label.empty'), 'bad'); return; }
+  E.busy = true; notice(tr('cur.saving')); render();
+  run('curriculumEditorSave', CurLogic.forSave(E.rows), E.version, E.labels).then(function (res) {
+    E.busy = false;
+    if (res.conflict) { notice(tr('cur.conflict'), 'bad'); render(); return; }
+    E.checks = res.checks;
+    if (!res.ok) {
+      // Name the topics with errors, open the first one and scroll to it (errors further down are easy to miss).
+      var bad = [];
+      res.checks.forEach(function (c, i) { if (c.errors.length) bad.push(i); });
+      notice(tr('cur.errors') + ' ' + tr('cur.errorsIn', { list: bad.map(function (i) { return label(E.rows[i].tag) + ' (' + (i + 1) + ')'; }).join(', ') }), 'bad');
+      if (bad.length) E.openIdx = bad[0];
+      render();
+      var first = document.querySelectorAll('#list .topic')[bad[0]];
+      if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    E.version = res.version; E.dirty = false; E.hasBackup = true; E.labels = {};
+    notice(tr('cur.saved'), 'ok');
+    render();
+  }, function (e) { E.busy = false; notice((e && e.message) || String(e), 'bad'); render(); });
+});
+$('reload').addEventListener('click', function () { if (!E.dirty || confirm(tr('cur.leave'))) load(); });
+$('undo').addEventListener('click', function () {
+  if (!confirm(tr('cur.undo.confirm'))) return;
+  run('curriculumEditorUndo', E.version).then(function (res) {
+    if (res.conflict) { notice(tr('cur.conflict'), 'bad'); return; }
+    if (!res.ok) { notice(res.message || '', 'bad'); return; }
+    load().then(function () { notice(tr('cur.undone'), 'ok'); });
+  }, function (e) { notice((e && e.message) || String(e), 'bad'); });
+});
+/** Code for a new topic: lowercase, a-z 0-9 and -, from the name ("Op het werk" → op-het-werk). */
+function tagKey(label) {
+  return String(label).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+$('newLabel').addEventListener('input', function () { $('newKey').textContent = tagKey($('newLabel').value) || '—'; });
+$('newAdd').addEventListener('click', function () {
+  var label = $('newLabel').value.trim(), key = tagKey(label);
+  if (!key) { notice(tr('cur.new.bad'), 'bad'); return; }
+  run('curriculumEditorNewTopic', key, label, $('newFr').value.trim(), E.version).then(function (t) {
+    E.tagList.push(t); E.tags[t.tag] = t;
+    E.rows = CurLogic.add(E.rows, t.tag); E.openIdx = E.rows.length - 1;
+    $('newLabel').value = ''; $('newFr').value = ''; $('newKey').textContent = '—';
+    // Saved on the server already (t.version): only unsaved if the tab had changed meanwhile.
+    if (t.version) E.version = t.version; else E.dirty = true;
+    E.checks = null;
+    notice(tr('cur.new.done', { label: t.label }), 'ok');
+    render();
+  }, function (e) { notice((e && e.message) || String(e), 'bad'); });
+});
+window.addEventListener('beforeunload', function (e) { if (E.dirty) { e.preventDefault(); e.returnValue = tr('cur.leave'); } });
+
+// First visit: the four rules in short sentences (closable; remembered in this browser only).
+(function () {
+  var seen = false;
+  try { seen = localStorage.getItem('speesrep-cur-hint') === '1'; } catch (e) { /* private mode */ }
+  if (seen) return;
+  var h = $('hint');
+  tr('cur.hint').forEach(function (s) { h.appendChild(el('p', { text: s })); });
+  h.appendChild(el('button', { 'class': 'btn', type: 'button', text: tr('cur.hint.close'), onclick: function () {
+    h.hidden = true;
+    try { localStorage.setItem('speesrep-cur-hint', '1'); } catch (e) { /* ignore */ }
+  } }));
+  h.hidden = false;
+})();
+
+render();
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,44 @@
+<nav class="nav" id="nav"></nav>
+<section class="info" id="info" hidden><div id="infoBody"></div></section>
+<script>
+// Shared navigation for the teacher pages (Start · Controleren · Curriculum) + the ⓘ panel with this page's
+// instructions (help.<page> in TeacherStrings). CTX = {page, env, urls:{start, review, curriculum}, appUrl}.
+/** "3 in de Inbox · 12 kaarten na te kijken" — '' when nothing waits on Controleren. */
+function todoText() {
+  var t = CTX.todo || {}, parts = [];
+  if (t.inbox) parts.push(tr('nav.todo.inbox', { n: t.inbox }));
+  if (t.cards) parts.push(tr('nav.todo.cards', { n: t.cards }));
+  return parts.join(' · ');
+}
+(function () {
+  var nav = document.getElementById('nav');
+  var add = function (tag, attrs, text) {
+    var n = document.createElement(tag);
+    Object.keys(attrs).forEach(function (k) { n.setAttribute(k, attrs[k]); });
+    n.textContent = text;
+    nav.appendChild(n);
+    return n;
+  };
+  add('span', { 'class': 'brand' }, tr('nav.brand') + ' ' + CTX.env);
+  ['start', 'review', 'curriculum'].forEach(function (p) {
+    var a = add('a', { href: CTX.urls[p], target: '_top', 'class': CTX.page === p ? 'on' : '' }, tr('nav.' + p));
+    if (p === 'review' && todoText()) {
+      var dot = document.createElement('span'); dot.className = 'dot'; a.appendChild(dot);
+      a.title = todoText(); a.setAttribute('aria-label', tr('nav.review') + ', ' + todoText());
+    }
+  });
+  var help = T['help.' + CTX.page];
+  if (!help) return;
+  var btn = add('button', { 'class': 'infobtn', type: 'button', 'aria-expanded': 'false', 'aria-controls': 'info', title: tr('nav.info'), 'aria-label': tr('nav.info') }, 'i');
+  var body = document.getElementById('infoBody');
+  var h = document.createElement('h2'); h.textContent = tr('help.' + CTX.page + '.title'); body.appendChild(h);
+  var ul = document.createElement('ul');
+  help.forEach(function (line) { var li = document.createElement('li'); li.textContent = line; ul.appendChild(li); });
+  body.appendChild(ul);
+  btn.addEventListener('click', function () {
+    var info = document.getElementById('info');
+    info.hidden = !info.hidden;
+    btn.setAttribute('aria-expanded', String(!info.hidden));
+  });
+})();
+</script>

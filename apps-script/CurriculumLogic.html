@@ -1,0 +1,102 @@
+<script>
+// Pure logic of the curriculum editor (no DOM). Loaded by CurriculumPage.html and by src/curriculumEditor.test.ts.
+// A row: {tag, rule: 'always'|'date'|'known'|'closed'|<other>, date: 'YYYY-MM-DD'|'', percentage: number|null,
+// from_tags: []}. Rows are in list order; order = position + 1 when saved.
+var CurLogic = (function () {
+  /** Changes only the rule: the hidden fields keep their values, so switching back restores them. */
+  function setRule(row, rule) {
+    var r = copy(row);
+    r.rule = rule;
+    return r;
+  }
+
+  function copy(row) {
+    return { tag: row.tag, rule: row.rule, date: row.date || '', percentage: row.percentage === undefined ? null : row.percentage,
+      from_tags: (row.from_tags || []).slice() };
+  }
+
+  /**
+   * After a reorder: van_tags must stand ABOVE their row. Drops those that don't (never on a dicht row: its
+   * values are parked) and returns the rows + a message per change ("tag: a, b").
+   */
+  function fixAbove(rows) {
+    var dropped = [];
+    var out = rows.map(function (row, i) {
+      var r = copy(row);
+      if (r.rule === 'closed') return r;
+      var above = rows.slice(0, i).map(function (x) { return x.tag; });
+      var keep = r.from_tags.filter(function (t) { return above.indexOf(t) !== -1; });
+      var gone = r.from_tags.filter(function (t) { return above.indexOf(t) === -1; });
+      if (gone.length) dropped.push(r.tag + ': ' + gone.join(', '));
+      r.from_tags = keep;
+      return r;
+    });
+    return { rows: out, dropped: dropped };
+  }
+
+  /** Omhoog (-1) / Omlaag (+1). */
+  function move(rows, i, dir) {
+    var j = i + dir;
+    if (j < 0 || j >= rows.length) return { rows: rows.map(copy), dropped: [] };
+    var r = rows.map(copy);
+    var t = r[i]; r[i] = r[j]; r[j] = t;
+    return fixAbove(r);
+  }
+
+  /** A subject without a row / a new subject: at the bottom, rule dicht (nothing opens by accident). */
+  function add(rows, tag) {
+    return rows.map(copy).concat([{ tag: tag, rule: 'closed', date: '', percentage: null, from_tags: [] }]);
+  }
+
+  /** Topics the multi-select may offer for row i: only those above it. */
+  function candidates(rows, i) {
+    return rows.slice(0, i).map(function (x) { return x.tag; });
+  }
+
+  function dateNl(iso, months) {
+    var p = String(iso).split('-').map(Number);
+    return p[2] + ' ' + months[p[1] - 1] + ' ' + p[0];
+  }
+
+  function daysUntil(today, iso) {
+    var a = today.split('-').map(Number), b = iso.split('-').map(Number);
+    return Math.round((Date.UTC(b[0], b[1] - 1, b[2]) - Date.UTC(a[0], a[1] - 1, a[2])) / 86400000);
+  }
+
+  /** The rule as a sentence ("Altijd open", "Opent op 16 november 2026", "Opent als 80% bekend is van: klok-1, app", "Dicht"). */
+  function sentence(row, tr) {
+    if (row.rule === 'always') return tr('cur.sentence.always');
+    if (row.rule === 'closed') return tr('cur.sentence.closed');
+    if (row.rule === 'date') return /^\d{4}-\d{2}-\d{2}$/.test(row.date) ? tr('cur.sentence.date', { date: dateNl(row.date, tr('months')) }) : tr('cur.sentence.dateEmpty');
+    if (row.rule === 'known') return tr('cur.sentence.known', { pct: row.percentage === null ? '?' : row.percentage, tags: row.from_tags.join(', ') || '?' });
+    return tr('cur.rule.unknown', { rule: row.rule });
+  }
+
+  /** Preview line (server data: today + scores per tag, scores = null when there is no Progress data). */
+  function preview(row, ctx, tr) {
+    if (row.rule === 'closed') return tr('cur.prev.closed');
+    if (row.rule === 'always') return tr('cur.prev.open');
+    if (row.rule === 'date') {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(row.date)) return '';
+      var n = daysUntil(ctx.today, row.date);
+      return n <= 0 ? tr('cur.prev.open') : n === 1 ? tr('cur.prev.day') : tr('cur.prev.days', { n: n });
+    }
+    if (row.rule === 'known') {
+      if (!ctx.scores) return tr('cur.prev.noData');
+      return row.from_tags.map(function (t) {
+        var s = ctx.scores[t];
+        return tr('cur.prev.score', { tag: t, score: s === undefined ? '?' : Math.round(s * 100), pct: row.percentage === null ? '?' : row.percentage });
+      }).join(' · ');
+    }
+    return '';
+  }
+
+  /** Rows for the server: order = position + 1. */
+  function forSave(rows) {
+    return rows.map(function (r, i) { var c = copy(r); c.order = i + 1; return c; });
+  }
+
+  return { setRule: setRule, fixAbove: fixAbove, move: move, add: add, candidates: candidates,
+    sentence: sentence, preview: preview, forSave: forSave, daysUntil: daysUntil, dateNl: dateNl };
+})();
+</script>

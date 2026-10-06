@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<?!= include_('TeacherStyle') ?>
+</head>
+<body>
+<script>var CTX = <?!= ctx ?>;</script>
+<?!= include_('TeacherStrings') ?>
+<?!= include_('TeacherNav') ?>
+<header>
+  <div class="seg" id="source"><button data-v="inbox" class="on">Inbox</button><button data-v="cards">Kaarten</button></div>
+  <div class="seg" id="mode"><button data-v="one">Eén voor één</button><button data-v="list" class="on">Lijst (5)</button></div>
+  <div class="stats"><span id="progress"></span> · goedgekeurd <b id="nApproved">0</b> · afgekeurd <b id="nRejected">0</b> · <span id="who"></span> · <span id="build" title="versie van deze pagina"></span> <b id="pending"></b></div>
+</header>
+<main>
+  <div class="bar">
+    <select id="tagFilter"><option value="">Alle tags</option></select>
+    <input id="q" placeholder="Zoek (nl, fr, antwoord)…">
+    <button class="btn" id="search">Zoeken</button>
+    <span id="inboxBar"></span>
+    <span class="bar" id="cardsBar" style="margin:0" hidden>
+      <select id="checkFilter">
+        <option value="unchecked">Nog niet goedgekeurd</option>
+        <option value="approved">Goedgekeurd</option>
+        <option value="rejected">Afgekeurd</option>
+        <option value="all" selected>Alle kaarten</option>
+      </select>
+      <span class="meta" id="pageInfo" style="margin:0"></span>
+      <button class="btn" id="pagePrev">‹ 50</button><button class="btn" id="pageNext">50 ›</button>
+    </span>
+    <div class="meta" id="gate" style="flex-basis:100%;margin:0" hidden></div>
+  </div>
+  <div id="view"><p class="empty">Laden…</p></div>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+var S = { source: 'inbox', mode: 'list', items: [], idx: 0, listStart: 0, boot: null, approved: 0, rejected: 0,
+          cards: { offset: 0, total: 0, check: 'all', counts: null, tagCounts: null }, tag: '', q: '', busy: false, all: [] };
+var $ = function (id) { return document.getElementById(id); };
+
+function run(fn) {
+  var args = [].slice.call(arguments, 1);
+  return new Promise(function (resolve, reject) {
+    google.script.run.withSuccessHandler(resolve).withFailureHandler(function (e) { reject(e); })[fn].apply(null, args);
+  });
+}
+function toast(text) { var t = $('toast'); t.textContent = text; t.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(function () { t.style.display = 'none'; }, 1600); }
+function fail(e) { S.busy = false; render(); alert((e && e.message) || String(e)); }
+function el(tag, attrs, kids) {
+  var n = document.createElement(tag);
+  Object.keys(attrs || {}).forEach(function (k) { if (k === 'text') n.textContent = attrs[k]; else if (k.slice(0, 2) === 'on') n.addEventListener(k.slice(2), attrs[k]); else n.setAttribute(k, attrs[k]); });
+  (kids || []).forEach(function (c) { if (c) n.appendChild(c); });
+  return n;
+}
+/** A subject's name as the student sees it (Tags.label_nl); the code only when the subject is unknown. */
+function tagLabel(tag) { var t = S.boot && S.boot.tags.filter(function (x) { return x.tag === tag; })[0]; return t ? t.label : tag; }
+function checkText(c) { return c.check === 'approved' ? '✓ goedgekeurd' : c.check === 'rejected' ? '✗ afgekeurd' : 'nog niet goedgekeurd'; }
+function typeNl(code) { var t = (S.boot.types.filter(function (x) { return x.code === code; })[0]); return t ? t.nl : code; }
+
+// ---------- loading ----------
+function load() {
+  if (Q.running || Q.jobs.length) { setTimeout(load, 400); return; } // let background saves finish first
+  S.busy = true; drafts = {}; render();
+  var p = S.source === 'inbox' ? run('reviewListInbox').then(function (rows) { S.all = rows; applyFilter(); })
+    : run('reviewListCards', S.cards.offset, 50, S.q, S.tag, S.cards.check).then(function (res) { S.items = res.rows; S.cards.total = res.total; S.cards.counts = res.counts; S.cards.tagCounts = res.tagCounts || null; });
+  return p.then(function () { S.idx = Math.min(S.idx, Math.max(0, S.items.length - 1)); S.listStart = 0; S.busy = false; render(); }, fail);
+}
+
+function applyFilter() {
+  S.items = S.all.filter(function (x) {
+    var q = S.q.trim().toLowerCase();
+    return (!S.tag || x.tags.indexOf(S.tag) !== -1)
+      && (!q || (x.nl + ' ' + x.fr + ' ' + x.answer).toLowerCase().indexOf(q) !== -1);
+  });
+}
+/** The one tag menu: every tag that has rows here (Inbox: counted on the page; Kaarten: counts from the server). */
+function fillTagMenu() {
+  if (!S.boot) return;
+  var n = null, total = null;
+  if (S.source === 'inbox') { n = {}; total = S.all.length; S.all.forEach(function (x) { x.tags.forEach(function (t) { n[t] = (n[t] || 0) + 1; }); }); }
+  else if (S.cards.tagCounts) { n = S.cards.tagCounts; total = S.cards.counts ? S.cards.counts[S.cards.check] : null; }
+  var sel = $('tagFilter'), opts = [['', 'Alle tags' + (total != null ? ' (' + total + ')' : '')]];
+  S.boot.tags.forEach(function (t) { if (!n || n[t.tag] || t.tag === S.tag) opts.push([t.tag, t.label + (n ? ' (' + (n[t.tag] || 0) + ')' : '')]); });
+  var key = opts.map(function (o) { return o.join('='); }).join('|');
+  if (sel.dataset.key === key) return;
+  sel.dataset.key = key; sel.innerHTML = '';
+  opts.forEach(function (o) { var e = el('option', { value: o[0], text: o[1] }); if (o[0] === S.tag) e.selected = true; sel.appendChild(e); });
+}
+
+// ---------- form ----------
+var drafts = {}; // unsaved edits per card id: a redraw never throws away what the teacher is typing
+function formFor(item) {
+  var f = drafts[item.id] || { type: item.type, nl: item.nl, article: item.article, pos: item.pos, fr: item.fr, example_nl: item.example_nl,
+            example_fr: item.example_fr, answer: item.answer, tags: item.tags.slice(), flags: item.flags.slice() };
+  drafts[item.id] = f;
+  var row = function (label, input) { return [el('label', { text: label }), input]; };
+  var inp = function (k, ph) { var i = el('input', { type: 'text', placeholder: ph || '', 'data-k': k }); i.value = f[k] || ''; i.addEventListener('input', function () { f[k] = i.value; }); return i; };
+  var typeSel = el('select'); S.boot.types.forEach(function (t) { var o = el('option', { value: t.code, text: t.nl }); if (t.code === f.type) o.selected = true; typeSel.appendChild(o); });
+  var artSel = el('select'); ['', 'de', 'het'].forEach(function (a) { var o = el('option', { value: a, text: a || '—' }); if (a === f.article) o.selected = true; artSel.appendChild(o); });
+  artSel.addEventListener('change', function () { f.article = artSel.value; });
+  var chips = function (list, key, labelOf) {
+    var box = el('div', { 'class': 'chips' });
+    list.forEach(function (v) {
+      var c = el('span', { 'class': 'chip' + (f[key].indexOf(v) !== -1 ? ' on' : ''), text: labelOf ? labelOf(v) : v });
+      c.addEventListener('click', function () { var i = f[key].indexOf(v); if (i === -1) f[key].push(v); else f[key].splice(i, 1); c.classList.toggle('on'); });
+      box.appendChild(c);
+    });
+    return box;
+  };
+  var answerRow = row('answer (enkel)', inp('answer', 'achterkant van een enkel-kaart'));
+  var setAnswerVisible = function () { answerRow.forEach(function (n) { n.style.display = f.type === 'oneway' ? '' : 'none'; }); };
+  typeSel.addEventListener('change', function () { f.type = typeSel.value; setAnswerVisible(); });
+  var tagLabels = {}; S.boot.tags.forEach(function (t) { tagLabels[t.tag] = t.label; }); // the subject's name (label_nl) only
+  var grid = el('div', { 'class': 'grid' }, [].concat(
+    row('type', typeSel), row('nl', inp('nl', 'Nederlands (enkel: de vraag/emoji)')), row('lidwoord', artSel), row('pos', inp('pos', 'zelfstandig naamwoord…')),
+    row('fr', inp('fr', 'Frans')), answerRow, row('example_nl', inp('example_nl')), row('example_fr', inp('example_fr')),
+    row('tags', chips(S.boot.tags.map(function (t) { return t.tag; }), 'tags', function (v) { return tagLabels[v]; })),
+    row('flags', chips(S.boot.flags, 'flags'))
+  ));
+  setAnswerVisible();
+  return { node: grid, values: f };
+}
+
+// ---------- actions (optimistic: the page moves on at once, the server works in the background) ----------
+var Q = { jobs: [], running: false };
+
+/** Same required-field rules as validateCard_ on the server, so background approvals rarely fail. */
+function validate(c) {
+  var errors = [];
+  var type = c.type || 'word';
+  if (!String(c.nl || '').trim()) errors.push('nl ontbreekt');
+  if (!(c.tags || []).length) errors.push('kies minstens één onderwerp (tag)');
+  if (type === 'oneway' && !String(c.answer || '').trim()) errors.push('answer ontbreekt (enkel)');
+  if (type !== 'oneway' && !String(c.fr || '').trim()) errors.push('fr ontbreekt');
+  if (type === 'sentence' && !/\{[^}]+\}/.test(String(c.nl || ''))) errors.push('zin: zet het doelwoord tussen {accolades}');
+  if (type === 'word' && /zelfstandig|noun/i.test(String(c.pos || '')) && c.article !== 'de' && c.article !== 'het') errors.push('zelfstandig naamwoord zonder de/het');
+  return errors;
+}
+/** Only the fields that differ from the item (null when nothing changed). */
+function changes(item, values) { var d = null; Object.keys(values || {}).forEach(function (k) { if (JSON.stringify(values[k]) !== JSON.stringify(item[k])) { d = d || {}; d[k] = values[k]; } }); return d; }
+function saveAndApprove(item, values) {
+  var errs = validate(merged(item, values));
+  if (errs.length) { showErrors(errs); return; }
+  var d = changes(item, values); if (d) act('save', item, d);
+  setCards([item], 'approved');
+}
+function merged(item, values) { var o = {}; Object.keys(item).forEach(function (k) { o[k] = item[k]; }); Object.keys(values || {}).forEach(function (k) { o[k] = values[k]; }); return o; }
+
+function enqueue(job) { Q.jobs.push(job); pending(); pump(); }
+function pending() {
+  var n = Q.jobs.length + (Q.running ? 1 : 0);
+  $('pending').textContent = n ? '⏳ ' + n + ' bezig…' : '';
+}
+function pump() {
+  if (Q.running || !Q.jobs.length) return;
+  var job = Q.jobs.shift(); Q.running = true; pending();
+  // Redraw only when the job changed what is on screen (a failure put a row back, …): a redraw after every
+  // background save rebuilt the form while the teacher was typing in it.
+  job.run().then(function (res) { return job.done ? job.done(res) : false; }, function (e) { if (job.fail) job.fail(e); return true; })
+    .then(function (changed) { Q.running = false; pending(); if (changed) render(); pump(); });
+}
+window.addEventListener('beforeunload', function (e) {
+  if (Q.running || Q.jobs.length) { e.preventDefault(); e.returnValue = ''; }
+});
+
+/** Takes a row out of the list now; returns a function that puts it back (used when the server says no). */
+function takeOut(item) {
+  var ia = S.all.indexOf(item), ii = S.items.indexOf(item);
+  removeItem(item.id);
+  return function () {
+    if (ia >= 0) S.all.splice(Math.min(ia, S.all.length), 0, item);
+    if (ii >= 0) S.items.splice(Math.min(ii, S.items.length), 0, item);
+  };
+}
+function back(msg) { return function (e) { alert(msg + ': ' + ((e && e.message) || e)); }; }
+
+function act(kind, item, values) {
+  var id = item.id;
+  if (kind === 'approve') {
+    var errs = validate(merged(item, values));
+    if (errs.length) { showErrors(errs); return; }
+    var putBack = takeOut(item); S.approved++; toast('Goedgekeurd'); render();
+    enqueue({
+      run: function () { return run('reviewApprove', id, values || null); },
+      done: function (r) { if (!r.ok) { putBack(); S.approved--; alert('"' + item.nl + '" niet goedgekeurd: ' + r.errors.join(', ')); return true; } return false; },
+      fail: function (e) { putBack(); S.approved--; back('"' + item.nl + '" niet goedgekeurd')(e); }
+    });
+  } else if (kind === 'delete') {
+    var where = S.source === 'inbox' ? 'uit de Inbox' : 'uit Kaarten';
+    var extra = S.source === 'inbox' ? '' : ' Als de leerling hem al oefende, komt hij ook niet meer terug om te herhalen.';
+    if (!confirm('"' + item.nl + '" definitief ' + where + ' verwijderen?' + extra + ' Dit kan niet ongedaan worden.')) return;
+    var src = S.source, putBackD = takeOut(item); toast('Verwijderd'); render();
+    enqueue({ run: function () { return run('reviewDelete', src, id); }, fail: function (e) { putBackD(); back('"' + item.nl + '" niet verwijderd')(e); } });
+  } else if (kind === 'toInbox') { // Kaarten › Afkeuren: the card goes back to the Inbox (with the edits)
+    var putBackT = takeOut(item); S.rejected++; toast('Afgekeurd: naar de Inbox'); render();
+    enqueue({ run: function () { return run('reviewCardToInbox', id, values || null); }, fail: function (e) { putBackT(); S.rejected--; back('"' + item.nl + '" niet verplaatst')(e); } });
+  } else { // save (on Vorige / Volgende): keep the edits locally at once
+    var before = merged(item, {});
+    Object.keys(values || {}).forEach(function (k) { item[k] = Array.isArray(values[k]) ? values[k].slice() : values[k]; });
+    toast('Opgeslagen');
+    render();
+    enqueue({
+      run: function () { return run('reviewSave', S.source, id, values); },
+      fail: function (e) { Object.keys(before).forEach(function (k) { item[k] = before[k]; }); back('"' + item.nl + '" niet opgeslagen')(e); }
+    });
+  }
+}
+
+function approveMany(rows) {
+  var ok = [], bad = [];
+  rows.forEach(function (x) {
+    var errs = validate(x);
+    if (errs.length) bad.push(x.nl + ': ' + errs.join(', ')); else ok.push(x);
+  });
+  if (!ok.length) { alert('Niet goed te keuren:\n' + bad.join('\n')); return; }
+  if (!confirm(ok.length + ' kaart(en) goedkeuren' + (bad.length ? ' (' + bad.length + ' met fouten blijven staan)' : '') + '?')) return;
+  var putBacks = ok.map(takeOut); S.approved += ok.length; toast(ok.length + ' goedgekeurd'); render();
+  if (bad.length) alert('Blijven in de Inbox (eerst verbeteren):\n' + bad.join('\n'));
+  enqueue({
+    run: function () { return run('reviewApproveMany', ok.map(function (x) { return x.id; })); },
+    done: function (res) {
+      var failed = res.filter(function (r) { return !r.ok; });
+      failed.forEach(function (r) { var i = ok.map(function (x) { return x.id; }).indexOf(r.id); if (i >= 0) putBacks[i](); S.approved--; });
+      if (!failed.length) return false;
+      alert('Niet goedgekeurd:\n' + failed.map(function (r) { return r.id + ': ' + r.errors.join(', '); }).join('\n'));
+      return true;
+    },
+    fail: function (e) { putBacks.forEach(function (f) { f(); }); S.approved -= ok.length; back('Niet goedgekeurd')(e); }
+  });
+}
+/** Does a card still belong in the list for the current Kaarten filter? */
+function matches(c) { var f = S.cards.check; return f === 'all' || (c.check || 'unchecked') === f; }
+
+/** Kaarten: Goedkeuren for one or more cards; the page moves on at once. */
+function setCards(items, value) {
+  var before = items.map(function (x) { return { check: x.check }; });
+  var count = function (sign) {
+    var c = S.cards.counts; if (!c) return;
+    items.forEach(function (x) { c[x.check || 'unchecked'] += sign; });
+  };
+  var putBacks = [];
+  count(-1);
+  items.forEach(function (x) { x.check = value; });
+  count(1);
+  items.forEach(function (x) { if (!matches(x)) putBacks.push(takeOut(x)); });
+  if (value === 'approved') S.approved += items.length; else S.rejected += items.length;
+  var undo = function (subset) {
+    count(-1);
+    items.forEach(function (x, i) { if (!subset || subset.indexOf(x.id) !== -1) { x.check = before[i].check; } });
+    count(1);
+    if (value === 'approved') S.approved -= subset ? subset.length : items.length; else S.rejected -= subset ? subset.length : items.length;
+  };
+  if (S.mode === 'one' && !putBacks.length) step(1);
+  toast((items.length > 1 ? items.length + ' ' : '') + (value === 'approved' ? 'goedgekeurd' : 'afgekeurd')); render();
+  enqueue({
+    run: function () { return run('reviewSetCheck', items.map(function (x) { return x.id; }), value); },
+    done: function (r) {
+      if (!r.errors || !r.errors.length) return;
+      undo(r.errors.map(function (e) { return e.id; })); load();
+      alert('Niet goedgekeurd:\n' + r.errors.map(function (e) { return e.id + ': ' + e.errors.join(', '); }).join('\n'));
+    },
+    fail: function (e) { undo(null); putBacks.forEach(function (f) { f(); }); back('Niet opgeslagen')(e); }
+  });
+}
+function approveCardsMany(rows) {
+  var ok = [], bad = [];
+  rows.forEach(function (x) {
+    var errs = validate(x);
+    if (errs.length) bad.push(x.nl + ': ' + errs.join(', ')); else ok.push(x);
+  });
+  if (!ok.length) { alert('Niet goed te keuren:\n' + bad.join('\n')); return; }
+  if (!confirm(ok.length + ' kaart(en) goedkeuren' + (bad.length ? ' (' + bad.length + ' met fouten blijven staan)' : '') + '?')) return;
+  if (bad.length) alert('Eerst verbeteren:\n' + bad.join('\n'));
+  setCards(ok, 'approved');
+}
+function removeItem(id) { S.all = S.all.filter(function (x) { return x.id !== id; }); S.items = S.items.filter(function (x) { return x.id !== id; }); S.idx = Math.min(S.idx, Math.max(0, S.items.length - 1)); }
+function showErrors(errs) { var e = document.querySelector('.errors'); if (e) e.textContent = 'Niet goedgekeurd: ' + errs.join(' · '); else alert('Niet goedgekeurd: ' + errs.join(', ')); }
+
+// ---------- render ----------
+var current = null;
+function render() {
+  $('cardsBar').hidden = S.source !== 'cards';
+  $('inboxBar').hidden = S.source !== 'inbox';
+  $('gate').hidden = S.source !== 'cards';
+  fillTagMenu();
+  var total = S.source === 'cards' ? S.cards.total : S.items.length;
+  $('progress').textContent = S.items.length ? (S.mode === 'one'
+    ? (S.idx + 1 + (S.source === 'cards' ? S.cards.offset : 0)) + ' van ' + total
+    : (S.listStart + 1) + '–' + Math.min(S.listStart + 5, S.items.length) + ' van ' + total) : '0 van 0';
+  $('nApproved').textContent = S.approved; $('nRejected').textContent = S.rejected;
+  if (S.cards.counts) {
+    var o = $('checkFilter').options, c = S.cards.counts;
+    o[0].text = 'Nog niet goedgekeurd (' + c.unchecked + ')';
+    o[1].text = 'Goedgekeurd (' + c.approved + ')'; o[2].text = 'Afgekeurd (' + c.rejected + ')'; o[3].text = 'Alle kaarten (' + c.all + ')';
+  }
+  if (S.boot) $('gate').textContent = S.boot.requireApproval ? 'De app krijgt alleen goedgekeurde kaarten.'
+    : 'Let op: require_approval staat uit, dus de app krijgt alle actieve kaarten (ook niet goedgekeurde).';
+  if (S.source === 'cards') $('pageInfo').textContent = 'kaarten ' + (S.cards.offset + 1) + '–' + Math.min(S.cards.offset + 50, S.cards.total) + ' van ' + S.cards.total;
+  // Keep the cursor where it was if a redraw happens while typing.
+  var act = document.activeElement, focusKey = act && act.getAttribute && act.getAttribute('data-k'), caret = focusKey ? act.selectionStart : null;
+  var view = $('view'); view.innerHTML = '';
+  if (!S.boot) return;
+  if (!S.items.length) { view.appendChild(el('p', { 'class': 'empty', text: S.busy ? 'Laden…' : (S.source === 'inbox' ? (S.all.length ? 'Niets meer met dit filter (nog ' + S.all.length + ' in de Inbox).' : 'De Inbox is leeg. 🎉') : 'Geen kaarten gevonden.') })); return; }
+  if (S.mode === 'one') renderOne(view); else renderList(view);
+  if (focusKey) {
+    var back = view.querySelector('[data-k="' + focusKey + '"]');
+    if (back) { back.focus(); if (caret !== null) back.setSelectionRange(caret, caret); }
+  }
+}
+
+function renderOne(view) {
+  var item = S.items[S.idx]; var form = formFor(item); current = { item: item, form: form };
+  var inbox = S.source === 'inbox';
+  var btn = function (label, cls, key, fn) { var b = el('button', { 'class': 'btn ' + cls }, [document.createTextNode(label), key ? el('kbd', { text: key }) : null]); b.disabled = S.busy; b.addEventListener('click', fn); return b; };
+  // Fewer buttons: edits are saved by Goedkeuren / Afkeuren and when you go to the previous or next card.
+  var actions = el('div', { 'class': 'actions' }, [
+    btn('Goedkeuren', 'good', 'A', function () { if (inbox) act('approve', item, form.values); else saveAndApprove(item, form.values); }),
+    inbox ? null : btn('Afkeuren', 'bad', 'R', function () { act('toInbox', item, changes(item, form.values)); }),
+    btn('‹ Vorige', '', 'K', function () { step(-1); }), btn('Volgende ›', '', 'J', function () { step(1); }),
+    btn('Verwijderen', 'bad', '', function () { act('delete', item); })
+  ].filter(Boolean));
+  view.appendChild(el('div', { 'class': 'panel' }, [
+    el('div', { 'class': 'meta', text: (inbox ? 'Inbox · ' : checkText(item) + ' · Kaart · ') + item.id + ' · ' + typeNl(item.type) + ' · toegevoegd ' + item.added + (item.active === false ? ' · niet actief' : '') }),
+    form.node, el('div', { 'class': 'errors' }), actions,
+    el('div', { 'class': 'help', text: 'Sneltoetsen (buiten een invoerveld): A goedkeuren · ' + (inbox ? '' : 'R afkeuren (naar de Inbox) · ') + 'J volgende · K vorige. Wijzigingen worden bewaard bij Goedkeuren, Afkeuren, Vorige en Volgende.' })
+  ]));
+}
+
+function renderList(view) {
+  var inbox = S.source === 'inbox';
+  var rows = S.items.slice(S.listStart, S.listStart + 5);
+  var tbl = el('table', {}, [el('thead', {}, [el('tr', {}, ['type', 'nl', 'fr / answer', 'tags', ''].map(function (h) { return el('th', { text: h }); }))])]);
+  var tb = el('tbody'); tbl.appendChild(tb);
+  rows.forEach(function (item, i) {
+    var b = function (label, cls, fn) { var x = el('button', { 'class': 'btn ' + cls, text: label }); x.disabled = S.busy; x.addEventListener('click', fn); return x; };
+    tb.appendChild(el('tr', {}, [
+      el('td', { text: typeNl(item.type) + (inbox ? '' : ' · ' + checkText(item)) }),
+      el('td', { text: (item.article ? item.article + ' ' : '') + item.nl }),
+      el('td', { text: item.type === 'oneway' ? item.answer : item.fr }),
+      el('td', { text: item.tags.map(tagLabel).join(', ') }),
+      el('td', {}, [
+        b('Detail', '', function () { S.mode = 'one'; S.idx = S.listStart + i; syncSeg(); render(); }), document.createTextNode(' '),
+        inbox ? b('Goedkeuren', 'good', function () { act('approve', item, null); })
+          : item.check === 'approved' ? null : b('Goedkeuren', 'good', function () { approveCardsMany([item]); }), document.createTextNode(' '),
+        inbox ? b('Verwijderen', 'bad', function () { act('delete', item); })
+          : b('Afkeuren', 'bad', function () { act('toInbox', item, null); })
+      ])
+    ]));
+  });
+  var nav = el('div', { 'class': 'actions' }, [
+    (function () { var x = el('button', { 'class': 'btn', text: '‹ Vorige 5' }); x.disabled = S.listStart === 0; x.onclick = function () { S.listStart = Math.max(0, S.listStart - 5); render(); }; return x; })(),
+    inbox ? (function () { var n = rows.length; var x = el('button', { 'class': 'btn good', text: 'Keur alle ' + n + ' goed' }); x.disabled = S.busy || !n; x.onclick = function () { approveMany(rows); }; return x; })()
+      : (function () { var todo = rows.filter(function (x) { return x.check !== 'approved'; }); var x = el('button', { 'class': 'btn good', text: 'Keur alle ' + todo.length + ' goed' }); x.disabled = S.busy || !todo.length; x.onclick = function () { approveCardsMany(todo); }; return x; })(),
+    (function () { var x = el('button', { 'class': 'btn', text: 'Volgende 5 ›' }); x.disabled = S.listStart + 5 >= S.items.length; x.onclick = function () { S.listStart += 5; render(); }; return x; })()
+  ]);
+  view.appendChild(tbl); view.appendChild(nav);
+}
+
+/** Vorige / Volgende: first keep the edits of this card (there is no Opslaan button). */
+function step(d) {
+  if (S.mode === 'one' && current) { var diff = changes(current.item, current.form.values); if (diff) act('save', current.item, diff); }
+  S.idx = Math.max(0, Math.min(S.items.length - 1, S.idx + d)); render();
+}
+function syncSeg() {
+  [['source', S.source], ['mode', S.mode]].forEach(function (p) { [].forEach.call($(p[0]).children, function (b) { b.classList.toggle('on', b.dataset.v === p[1]); }); });
+}
+
+// ---------- events ----------
+$('source').addEventListener('click', function (e) {
+  var v = e.target.dataset.v; if (!v || v === S.source) return;
+  S.source = v; S.idx = 0; S.tag = ''; S.q = ''; $('q').value = ''; S.cards.offset = 0; // each list starts unfiltered
+  syncSeg(); load();
+});
+$('mode').addEventListener('click', function (e) { var v = e.target.dataset.v; if (!v) return; S.mode = v; if (v === 'list') S.listStart = Math.floor(S.idx / 5) * 5; syncSeg(); render(); });
+function applySearch() {
+  S.tag = $('tagFilter').value; S.q = $('q').value; S.idx = 0; S.listStart = 0;
+  if (S.source === 'inbox') { applyFilter(); render(); } else { S.cards.offset = 0; load(); }
+}
+$('tagFilter').addEventListener('change', applySearch);
+$('checkFilter').addEventListener('change', function () { S.cards.check = $('checkFilter').value; S.cards.offset = 0; S.idx = 0; load(); });
+$('search').addEventListener('click', applySearch);
+$('q').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('search').click(); });
+$('pagePrev').addEventListener('click', function () { S.cards.offset = Math.max(0, S.cards.offset - 50); S.idx = 0; load(); });
+$('pageNext').addEventListener('click', function () { if (S.cards.offset + 50 < S.cards.total) { S.cards.offset += 50; S.idx = 0; load(); } });
+document.addEventListener('keydown', function (e) {
+  if (S.mode !== 'one' || !current || S.busy) return; // S.busy = only while a list is loading
+  var typing = /INPUT|SELECT|TEXTAREA/.test(e.target.tagName);
+  if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
+  var k = e.key.toLowerCase(), inbox = S.source === 'inbox';
+  if (k === 'a' && inbox) act('approve', current.item, current.form.values);
+  else if (k === 'a') saveAndApprove(current.item, current.form.values);
+  else if (k === 'r' && !inbox) act('toInbox', current.item, changes(current.item, current.form.values));
+  else if (k === 'j' || e.key === 'ArrowRight') step(1);
+  else if (k === 'k' || e.key === 'ArrowLeft') step(-1);
+});
+
+run('reviewBootstrap').then(function (b) {
+  b.tags.sort(function (x, y) { return x.label.localeCompare(y.label, 'nl', { sensitivity: 'base' }); }); // menu + chips A–Z
+  S.boot = b; $('who').textContent = b.email; $('build').textContent = 'versie ' + b.build;
+  load();
+}, function (e) { $('view').innerHTML = ''; $('view').appendChild(el('p', { 'class': 'empty', text: (e && e.message) || String(e) })); });
+</script>
+</body>
+</html>

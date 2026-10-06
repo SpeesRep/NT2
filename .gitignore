@@ -1,0 +1,8 @@
+node_modules/
+.env*
+!.env.example
+.clasprc.json
+*.tokens
+secrets.tmp*
+backups/
+apps-script/SetupProperties.*

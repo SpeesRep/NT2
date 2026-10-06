@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<?!= include_('TeacherStyle') ?>
+</head>
+<body>
+<script>var CTX = <?!= ctx ?>;</script>
+<?!= include_('TeacherStrings') ?>
+<?!= include_('TeacherNav') ?>
+<main>
+  <h1 id="title"></h1>
+  <p id="intro" class="meta"></p>
+  <div class="tiles">
+    <a class="tile" id="tReview" target="_top"><h2></h2><p></p></a>
+    <a class="tile" id="tCurriculum" target="_top"><h2></h2><p></p></a>
+    <section class="tile share" id="tShare"><h2></h2><p id="shareLink"></p><ol id="shareSteps"></ol><p class="meta" id="shareNote"></p></section>
+  </div>
+</main>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  $('title').textContent = tr('start.title');
+  $('intro').textContent = tr('start.intro');
+  [['tReview', 'review'], ['tCurriculum', 'curriculum']].forEach(function (x) {
+    var a = $(x[0]);
+    a.href = CTX.urls[x[1]];
+    a.querySelector('h2').textContent = tr('start.' + x[1] + '.title');
+    a.querySelector('p').textContent = tr('start.' + x[1] + '.text');
+    if (x[1] === 'review' && todoText()) {
+      var dot = document.createElement('span'); dot.className = 'dot'; a.querySelector('h2').appendChild(dot);
+      var line = document.createElement('p'); line.textContent = todoText(); line.style.fontWeight = '600'; a.appendChild(line);
+    }
+  });
+  $('tShare').querySelector('h2').textContent = tr('start.share.title');
+  var p = $('shareLink');
+  p.appendChild(document.createTextNode(tr('start.share.link') + ' '));
+  var code = document.createElement('code'); code.textContent = CTX.appUrl; p.appendChild(code);
+  tr('start.share.steps').forEach(function (s) { var li = document.createElement('li'); li.textContent = s; $('shareSteps').appendChild(li); });
+  $('shareNote').textContent = tr('start.share.note', { env: CTX.env });
+})();
+</script>
+</body>
+</html>
