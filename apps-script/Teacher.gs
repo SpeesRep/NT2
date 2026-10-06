@@ -68,7 +68,7 @@ function serveTeacher_(page) {
   var base = teacherUrl_();
   var t = HtmlService.createTemplateFromFile(TEACHER_PAGES[p].file);
   t.ctx = JSON.stringify({
-    page: p, env: env_(), appUrl: APP_URLS[env_()] || '', todo: reviewTodo_(),
+    page: p, env: env_(), appUrl: APP_URLS[env_()] || '', todo: reviewTodo_(), publish: publishInfo_(),
     urls: { start: base + '?page=start', review: base + '?page=review', curriculum: base + '?page=curriculum' }
   }).replace(/</g, '\\u003c');
   return t.evaluate()

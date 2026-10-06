@@ -15,6 +15,7 @@
   <div class="tiles">
     <a class="tile" id="tReview" target="_top"><h2></h2><p></p></a>
     <a class="tile" id="tCurriculum" target="_top"><h2></h2><p></p></a>
+    <section class="tile share" id="tPublish"><h2></h2><p></p><p><button class="btn primary" id="publishBtn"></button> <span id="publishMsg" class="meta"></span></p><p class="meta"><span id="publishLast"></span> · <a id="publishRuns" target="_blank" rel="noopener"></a></p></section>
     <section class="tile share" id="tShare"><h2></h2><p id="shareLink"></p><ol id="shareSteps"></ol><p class="meta" id="shareNote"></p></section>
   </div>
 </main>
@@ -39,6 +40,25 @@
   var code = document.createElement('code'); code.textContent = CTX.appUrl; p.appendChild(code);
   tr('start.share.steps').forEach(function (s) { var li = document.createElement('li'); li.textContent = s; $('shareSteps').appendChild(li); });
   $('shareNote').textContent = tr('start.share.note', { env: CTX.env });
+
+  // Publiceren: GitHub builds content.json from this sheet (Publish.gs → content.yml).
+  var pub = $('tPublish'), btn = $('publishBtn'), msg = $('publishMsg');
+  pub.querySelector('h2').textContent = tr('start.publish.title');
+  pub.querySelector('p').textContent = tr('start.publish.text', { env: CTX.env });
+  btn.textContent = tr('start.publish.button', { env: CTX.env });
+  var when = function (iso) { return iso ? new Date(iso).toLocaleString('nl-BE', { dateStyle: 'medium', timeStyle: 'short' }) : ''; };
+  var showLast = function (iso) { $('publishLast').textContent = iso ? tr('start.publish.last', { at: when(iso) }) : tr('start.publish.never'); };
+  showLast(CTX.publish.last);
+  $('publishRuns').textContent = tr('start.publish.runs');
+  $('publishRuns').href = CTX.publish.runs;
+  btn.addEventListener('click', function () {
+    if (!confirm(tr('start.publish.confirm', { env: CTX.env }))) return;
+    btn.disabled = true; msg.textContent = tr('start.publish.busy');
+    google.script.run
+      .withSuccessHandler(function (r) { btn.disabled = false; msg.textContent = tr('start.publish.done'); showLast(r.at); })
+      .withFailureHandler(function (e) { btn.disabled = false; msg.textContent = tr('start.publish.error', { msg: e.message }); })
+      .reviewPublish();
+  });
 })();
 </script>
 </body>

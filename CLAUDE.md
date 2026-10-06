@@ -5,9 +5,28 @@ learner). Code copied from Fanki on 2026-10-06 without history; technical names 
 (IndexedDB `NS` `speesrep-prod`/`speesrep-dev`, Workbox cacheId, backup `app`) and the URLs `/NT2/`.
 
 **Core rule: no data collection.** All progress stays on the device; the app only fetches the word list.
-Work in progress (phases): 1 repo/rename/config ✓ · 2 static content.json (app reads only its own origin, CSP) ·
-3 progress export/import + storage.persist · 4 multiple groups (design first). Until phase 2 lands, the
-sections below still describe the inherited Fanki design (API sync, reviews to the Sheet, one learner).
+Work in progress (phases): 1 repo/rename/config ✓ · 2 static content.json ✓ · 3 progress export/import +
+storage.persist · 4 multiple groups (design first). Sections below that still talk about syncing reviews to the
+Sheet, Log/Progress or "her" are inherited from Fanki and outdated where they contradict this header.
+
+## Content publishing (no data collection)
+
+- The app's ONLY network use: `GET <base>content.json` from its own origin (`CONTENT_URL`, `syncNow` in src/sync.ts:
+  on launch, when back online, on return to the foreground after > 2 min, and "Bijwerken" in the menu). It stores
+  the list only when `version` changed (`meta.contentVersion`). Ratings stay in IndexedDB (`recordReview` writes no
+  outbox event; the old `queue` store stays empty). No API client, no tokens in the app.
+- CSP meta tag (production builds, `CSP` in vite.config.ts): everything `'self'`, `connect-src 'self'`. No external
+  origins, no analytics. e2e asserts only same-origin GETs and no CSP violations.
+- `.github/workflows/content.yml` (Actions → Publish content, or repository_dispatch `publish` with
+  client_payload.env): `scripts/build-content.mjs <env>` calls the admin action `content` (POST, ADMIN_TOKEN_<ENV>
+  secret) → validates (non-empty, env matches, card ids present/unique/never derived from the word: random
+  `c_xxxxxxxxxx` or hand-made codes like `K-01`) → `{format:1, version (sha256 of the content), env, generated_at,
+  cards, settings, tags, curriculum}` → commits `<env>/content.json` to the `content` branch only when the version
+  changed → calls deploy.yml (workflow_call), which copies it to `/NT2/content.json` (PROD) and
+  `/NT2/dev/content.json` (DEV). content.json is never precached by the service worker.
+- "Publiceren" = a tile on the teacher Start page (apps-script/Publish.gs `reviewPublish`): POSTs the
+  repository_dispatch with Script Property `GITHUB_DISPATCH_TOKEN` (fine-grained token, SpeesRep/NT2 only,
+  Contents: Read and write). A sheet menu is impossible: the projects are standalone, not bound to the sheets.
 
 Google account **speesrep@gmail.com** (never the Fanki account): sheets "Dutch DEV"/"Dutch PROD" (ids in
 `sheets.json`), standalone Apps Script projects (`.clasp.dev.json`, `.clasp.prod.json`), web-app deployments in
