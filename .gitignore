@@ -1,8 +1,24 @@
-node_modules/
+# secrets — never commit
+.env.local
+.env.*.local
 .env*
 !.env.example
+.clasprc
 .clasprc.json
-*.tokens
-secrets.tmp*
-backups/
+apps-script/Secrets.local.gs
 apps-script/SetupProperties.*
+secrets.tmp*
+*.tokens
+
+# build / deps
+node_modules/
+dist/
+playwright-report/
+test-results/
+.DS_Store
+e2e-dist/
+backups/
+
+# Teacher word lists (copyrighted source material; never commit)
+docs/klim-op-*.csv
+docs/openmoji-*.csv

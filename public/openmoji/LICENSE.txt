@@ -1,0 +1,3 @@
+These images are from OpenMoji 17.0.0 (https://openmoji.org/), the open-source emoji and icon project.
+License: CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).
+Only the files the app uses are included, losslessly optimised with SVGO (no visual change).

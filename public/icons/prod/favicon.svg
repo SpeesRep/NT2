@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect width="1024" height="1024" fill="#101418"/>
+  <g transform="translate(0 0) scale(1)">
+    <g transform="rotate(-7 512 490)"><rect x="262" y="170" width="500" height="640" rx="56" fill="#2a3440"/></g>
+    <rect x="262" y="170" width="500" height="640" rx="56" fill="#f4f1ea"/>
+    <clipPath id="c"><rect x="262" y="170" width="500" height="640" rx="56" fill="#000"/></clipPath>
+    <g clip-path="url(#c)">
+      <rect x="0" y="170" width="1024" height="50" fill="#ae1c28"/>
+      <rect x="0" y="270" width="1024" height="50" fill="#21468b"/>
+    </g>
+    <text x="512" y="620" font-family="Helvetica, Arial, sans-serif" font-weight="700" font-size="230" text-anchor="middle" fill="#101418">nl</text>
+  </g>
+  
+</svg>

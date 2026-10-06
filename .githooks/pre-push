@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# stdin: <local ref> <local sha> <remote ref> <remote sha>
+z=0000000000000000000000000000000000000000
+root="$(git rev-parse --show-toplevel)"
+while read -r lref lsha rref rsha; do
+  [[ "$lsha" == "$z" ]] && continue
+  if [[ "$rsha" == "$z" ]]; then range=("$lsha" --not --remotes); else range=("$rsha..$lsha"); fi
+  "$root/scripts/check-secrets.sh" --range "${range[@]}" || exit 1
+done
+"$root/scripts/check-secrets.sh" --tree
