@@ -90,7 +90,23 @@ export const UI = {
   'backup.title': { nl: 'Back-up', fr: 'Sauvegarde' },
   'backup.save': { nl: 'Back-up opslaan', fr: 'Enregistrer une sauvegarde (fichier)' },
   'backup.load': { nl: 'Back-up terugzetten', fr: 'Restaurer une sauvegarde (fichier)' },
-  'backup.done': { nl: 'Back-up teruggezet.', fr: 'Sauvegarde restaurée.' },
+  'backup.done': { nl: 'Back-up teruggezet: {n} kaarten.', fr: 'Sauvegarde restaurée : progression de {n} cartes reprise.' },
+  'backup.skipped': { nl: '{n} delen van de back-up zijn niet goed. Die blijven weg.', fr: '{n} éléments de la sauvegarde sont abîmés : ils sont ignorés.' },
+  'backup.confirmTitle': { nl: 'Back-up terugzetten?', fr: 'Restaurer la sauvegarde ?' },
+  'backup.confirm': {
+    nl: 'De back-up vervangt je voortgang van {n} kaarten op dit toestel. Nieuwere voortgang blijft.',
+    fr: 'La sauvegarde remplace ta progression pour {n} cartes sur cet appareil. Une progression plus récente est gardée.'
+  },
+  'backup.replace': { nl: 'Vervangen', fr: 'Remplacer' },
+  'backup.cancel': { nl: 'Annuleren', fr: 'Annuler' },
+  'backup.note': {
+    nl: 'Je voortgang staat alleen op dit toestel. Bewaar soms een back-up.',
+    fr: 'Ta progression est seulement sur cet appareil. Enregistre parfois une sauvegarde (fichier).'
+  },
+  'backup.notPersisted': {
+    nl: 'Let op: de browser kan je voortgang wissen. Bewaar vaak een back-up.',
+    fr: 'Attention : le navigateur peut effacer ta progression. Enregistre souvent une sauvegarde.'
+  },
   'backup.bad': { nl: 'Dit is geen SpeesRep-back-up.', fr: 'Ce fichier n’est pas une sauvegarde SpeesRep.' },
   'backup.otherApp': { nl: 'Deze back-up is van een andere versie van de app.', fr: 'Cette sauvegarde vient d’une autre version de l’appli (DEV/PROD).' },
   'progress.learned': { nl: 'kaarten geoefend (van {n})', fr: 'cartes déjà travaillées (sur {n} en tout)' },

@@ -1,3 +1,4 @@
+import { readFileSync, writeFileSync } from 'node:fs';
 import { expect, test, type Page, type Route } from '@playwright/test';
 
 // The app's only network use: content.json from its own origin (published by the content Action).
@@ -261,3 +262,94 @@ test('enkel/emoji card, 🔊 without a Dutch voice, and 🚩 flags (flag, note, 
   await expect(page.getByRole('menuitem', { name: /Gemarkeerd/ })).toHaveText(/^🚩 Gemarkeerd$/);
 });
 
+
+test('backup: save as a file, restore on a fresh device, ask before replacing newer progress here', async ({ page, context }, info) => {
+  const server = mockServer({ new_per_day: 5, unlock_prod_stability_days: 365, show_french_help: true });
+  const csp = watchCsp(page);
+  await server.install(page);
+  await page.goto('/NT2/dev/');
+  await waitSynced(page);
+  const openSettings = async () => {
+    await page.getByRole('button', { name: 'Menu openen' }).click();
+    await page.getByRole('menuitem', { name: /Instellingen/ }).click();
+  };
+  const lastReviews = () =>
+    page.evaluate(
+      () =>
+        new Promise<string[]>((res) => {
+          const r = indexedDB.open('speesrep-dev');
+          r.onsuccess = () => {
+            const q = r.result.transaction('progress').objectStore('progress').getAll();
+            q.onsuccess = () => res(q.result.map((p: { last_review: string }) => p.last_review));
+          };
+        })
+    );
+  const toastGone = () => expect(page.locator('.toast')).toHaveCount(0, { timeout: 10_000 });
+  const progressCount = () =>
+    page.evaluate(
+      () =>
+        new Promise<number>((res) => {
+          const r = indexedDB.open('speesrep-dev');
+          r.onsuccess = () => {
+            const q = r.result.transaction('progress').objectStore('progress').count();
+            q.onsuccess = () => res(q.result);
+          };
+        })
+    );
+
+  // 1. Rate 2 cards, save a backup (no share sheet in this browser → a download).
+  await page.getByRole('button', { name: 'Starten' }).click();
+  await rateEasy(page, 2);
+  await page.getByRole('button', { name: /Terug/ }).click();
+  await openSettings();
+  await expect(page.getByText(/Je voortgang staat alleen op dit toestel|de browser kan je voortgang wissen/)).toBeVisible();
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Back-up opslaan' }).click()]);
+  expect(download.suggestedFilename()).toMatch(/^speesrep-dev-backup-\d{4}-\d{2}-\d{2}\.json$/);
+  const file = info.outputPath('backup.json');
+  await download.saveAs(file);
+
+  // 2. Restoring onto the same progress changes nothing and needs no question.
+  await page.locator('input[type=file]').setInputFiles(file);
+  await expect(page.getByText('Back-up teruggezet: 0 kaarten.')).toBeVisible();
+  await toastGone();
+
+  // 3. A fresh device: the backup brings the 2 cards back, without a question (nothing to replace).
+  // (deleted from a same-origin page that is not the app, so no open connection blocks it)
+  await page.goto('/NT2/dev/manifest.webmanifest');
+  await page.evaluate(() => new Promise((res) => {
+    const r = indexedDB.deleteDatabase('speesrep-dev');
+    r.onsuccess = r.onerror = r.onblocked = () => res(null);
+  }));
+  await page.goto('/NT2/dev/');
+  await waitSynced(page);
+  expect(await progressCount()).toBe(0);
+  await openSettings();
+  await page.locator('input[type=file]').setInputFiles(file);
+  await expect(page.getByText('Back-up teruggezet: 2 kaarten.')).toBeVisible();
+  expect(await progressCount()).toBe(2);
+  await toastGone();
+
+  // 4. A backup that is NEWER than this device: the app asks first; Annuleren keeps everything as it is.
+  const newer = JSON.parse(readFileSync(file, 'utf8'));
+  for (const p of newer.progress) p.last_review = '2099-01-01T00:00:00.000Z';
+  const newerFile = info.outputPath('newer.json');
+  writeFileSync(newerFile, JSON.stringify(newer));
+  await page.locator('input[type=file]').setInputFiles(newerFile);
+  const ask = page.getByRole('alertdialog', { name: 'Back-up terugzetten?' });
+  await expect(ask).toContainText('vervangt je voortgang van 2 kaarten');
+  await ask.getByRole('button', { name: 'Annuleren' }).click();
+  await expect(ask).toBeHidden();
+  expect((await lastReviews()).some((t) => t.startsWith('2099'))).toBe(false);
+  await page.locator('input[type=file]').setInputFiles(newerFile);
+  await ask.getByRole('button', { name: 'Vervangen' }).click();
+  await expect(page.getByText('Back-up teruggezet: 2 kaarten.')).toBeVisible();
+  await expect.poll(lastReviews).toEqual(['2099-01-01T00:00:00.000Z', '2099-01-01T00:00:00.000Z']);
+  await toastGone();
+
+  // 5. Not a backup: refused.
+  const junk = info.outputPath('junk.json');
+  writeFileSync(junk, '{"hello":1}');
+  await page.locator('input[type=file]').setInputFiles(junk);
+  await expect(page.getByText('Dit is geen SpeesRep-back-up.')).toBeVisible();
+  expect(csp).toEqual([]);
+});

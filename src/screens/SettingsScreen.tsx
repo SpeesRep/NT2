@@ -2,14 +2,18 @@ import { useState } from 'preact/hooks';
 import { t, type UIKey } from '../i18n';
 import { setUserSetting, useSettingControls } from '../settings';
 import { SETTING_ROWS } from '../userSettings';
-import { BackupError, backupFileName, exportBackup, importBackup } from '../backup';
+import { BackupError, backupFileName, exportBackup, importBackup, previewBackup, readBackupFile, type Backup } from '../backup';
+import { usePersisted } from '../storage';
 import { loadFromDb } from '../store';
 import { showToast } from '../components/Toast';
 
-/** "Instellingen": her own settings (phone only) + her JSON backup. Every change is saved at once. */
+/** "Instellingen": the learner's own settings (device only) + the JSON backup. Every change is saved at once. */
 export function SettingsScreen({ onDone }: { onDone: () => void }) {
   const c = useSettingControls();
   const [busy, setBusy] = useState(false);
+  const persisted = usePersisted();
+  /** A checked backup that would replace records here: waits for "Vervangen" / "Annuleren". */
+  const [pending, setPending] = useState<{ file: Backup; replace: number } | null>(null);
 
   const row = (key: (typeof SETTING_ROWS)[number]['key'], label: string) => {
     if (key === 'newPerDay') {
@@ -73,19 +77,32 @@ export function SettingsScreen({ onDone }: { onDone: () => void }) {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
+  const apply = async (file: Backup) => {
+    setBusy(true);
+    try {
+      const n = await importBackup(file);
+      await loadFromDb();
+      showToast(t('backup.done', { n: n.progress }));
+    } catch {
+      showToast(t('backup.bad'), { ms: 5000 });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Checks the file, then imports at once, or first asks when it would replace progress on this device. */
   const load = async (input: HTMLInputElement) => {
     const f = input.files?.[0];
     input.value = '';
     if (!f) return;
-    setBusy(true);
     try {
-      await importBackup(JSON.parse(await f.text()));
-      await loadFromDb();
-      showToast(t('backup.done'));
+      const file = await readBackupFile(f);
+      const p = await previewBackup(file);
+      if (p.skipped) showToast(t('backup.skipped', { n: p.skipped }), { ms: 5000 });
+      if (p.replace > 0) setPending({ file, replace: p.replace });
+      else await apply(file);
     } catch (e) {
       showToast(e instanceof BackupError && e.message === 'otherApp' ? t('backup.otherApp') : t('backup.bad'), { ms: 5000 });
-    } finally {
-      setBusy(false);
     }
   };
 
@@ -103,7 +120,30 @@ export function SettingsScreen({ onDone }: { onDone: () => void }) {
           {t('backup.load')}
           <input type="file" accept="application/json,.json" hidden disabled={busy} onChange={(e) => void load(e.target as HTMLInputElement)} />
         </label>
+        <p class="setting-note muted">{t(persisted === false ? 'backup.notPersisted' : 'backup.note')}</p>
       </section>
+
+      {pending && (
+        <div class="sheet-backdrop" onClick={() => setPending(null)}>
+          <div class="sheet" role="alertdialog" aria-modal="true" aria-label={t('backup.confirmTitle')} onClick={(e) => e.stopPropagation()}>
+            <h2>{t('backup.confirmTitle')}</h2>
+            <p>{t('backup.confirm', { n: pending.replace })}</p>
+            <button
+              class="btn btn-primary btn-block"
+              onClick={() => {
+                const file = pending.file;
+                setPending(null);
+                void apply(file);
+              }}
+            >
+              {t('backup.replace')}
+            </button>
+            <button class="btn btn-secondary btn-block" onClick={() => setPending(null)}>
+              {t('backup.cancel')}
+            </button>
+          </div>
+        </div>
+      )}
 
       <button class="btn btn-primary btn-huge topics-done" onClick={onDone}>
         {t('tags.done')}

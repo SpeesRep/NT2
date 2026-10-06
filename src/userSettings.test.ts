@@ -5,7 +5,8 @@ import { effectiveSettings } from './settings';
 import { getNewPerDay } from './today';
 import { EMPTY_USER_SETTINGS, newPerDayChoices, saveUserSettings, loadUserSettings } from './userSettings';
 import { answerIsDutch, listenMode } from './tts';
-import { BackupError, checkBackup, exportBackup, importBackup } from './backup';
+import { BackupError, MAX_BACKUP_BYTES, checkBackup, exportBackup, importBackup, previewBackup, readBackupFile } from './backup';
+import { NS } from './config';
 import { DEFAULT_SETTINGS, type Card } from './types';
 import { progressKey, type Progress } from './scheduler';
 
@@ -77,21 +78,23 @@ describe('JSON backup', () => {
     difficulty: 5, reps: 3, lapses: 0, last_review: last, learning_steps: 0, scheduled_days: 5
   });
 
-  it('export → import round-trips userSettings, progress, unsent reviews and flags', async () => {
+  const T = '2026-10-03T10:00:00.000Z';
+
+  it('export → import round-trips userSettings, progress and flags (no review outbox)', async () => {
     const d = await db();
-    await d.put('progress', prog(progressKey('w1', 'recog'), '2026-10-03T10:00:00.000Z'));
-    await d.put('queue', { event_id: 'e1', card_id: 'w1', track: 'recog', ts: '2026-10-03T10:00:00.000Z', rating: 3, mode: 'nl_fr', duration_ms: 1, snapshot: {} as never });
-    await d.put('flags', { id: 'f1', card_id: 'w1', ts: 'x', note: 'n', resolved: false, updated_ts: 'x' });
+    await d.put('progress', prog(progressKey('w1', 'recog'), T));
+    await d.put('flags', { id: 'f1', card_id: 'w1', ts: T, note: 'n', resolved: false, updated_ts: T });
     await setMeta('userSettings', { newPerDay: 20, listeningEnabled: false, readAnswer: null });
     const file = JSON.parse(JSON.stringify(await exportBackup()));
 
     indexedDB = new IDBFactory(); // a new phone
     _resetDb();
-    expect(await importBackup(file)).toEqual({ progress: 1, queue: 1, flags: 1 });
+    expect(file.queue).toBeUndefined();
+    expect(await previewBackup(file)).toEqual({ add: 1, replace: 0, keep: 0, skipped: 0 });
+    expect(await importBackup(file)).toEqual({ progress: 1, flags: 1 });
     expect(await getMeta('userSettings')).toEqual({ newPerDay: 20, listeningEnabled: false, readAnswer: null });
     const d2 = await db();
     expect((await d2.get('progress', 'w1|recog'))?.reps).toBe(3);
-    expect(await d2.get('queue', 'e1')).toBeTruthy();
     expect((await d2.get('flags', 'f1'))?.note).toBe('n');
   });
 
@@ -102,6 +105,41 @@ describe('JSON backup', () => {
     await d.put('progress', { ...prog('w1|recog', '2026-10-04T10:00:00.000Z'), reps: 9 });
     expect((await importBackup(file)).progress).toBe(0);
     expect((await d.get('progress', 'w1|recog'))?.reps).toBe(9);
+  });
+
+  it('preview counts what the file would replace (newer in the file) and keep (newer here)', async () => {
+    const d = await db();
+    await d.put('progress', prog('w1|recog', '2026-10-05T10:00:00.000Z'));
+    await d.put('progress', prog('w2|recog', '2026-10-01T10:00:00.000Z'));
+    const file = {
+      app: 'speesrep', version: 1, ns: NS, exported_at: T, flags: [], meta: {},
+      progress: [prog('w1|recog', '2026-10-02T10:00:00.000Z'), prog('w2|recog', '2026-10-04T10:00:00.000Z'), prog('w3|recog', T)]
+    };
+    expect(await previewBackup(file)).toEqual({ add: 1, replace: 1, keep: 1, skipped: 0 });
+  });
+
+  it('leaves out invalid records, refuses a file with only invalid ones', () => {
+    const base = { app: 'speesrep', version: 1, ns: NS, exported_at: T, flags: [], meta: {} };
+    const good = prog('w1|recog', T);
+    const bad = [
+      { ...good, key: 'w1' }, // key must be card|track
+      { ...good, key: 'w1|x', track: 'x' },
+      { ...good, due: 'soon' },
+      { ...good, stability: Number.NaN },
+      { ...good, reps: -1 },
+      null
+    ];
+    const b = checkBackup({ ...base, progress: [good, ...bad] });
+    expect(b.progress).toHaveLength(1);
+    expect(b.skipped).toBe(bad.length);
+    expect(() => checkBackup({ ...base, progress: bad })).toThrow('bad');
+    expect(checkBackup({ ...base, progress: [] }).progress).toEqual([]); // an empty backup is fine
+  });
+
+  it('refuses files that are too big or not JSON', async () => {
+    await expect(readBackupFile(new Blob(['{nope']))).rejects.toThrow('bad');
+    const big = { size: MAX_BACKUP_BYTES + 1, text: async () => '{}' } as unknown as Blob;
+    await expect(readBackupFile(big)).rejects.toThrow('bad');
   });
 
   it('refuses other files and backups of the other app (DEV/PROD)', () => {

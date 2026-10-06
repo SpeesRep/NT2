@@ -21,8 +21,6 @@ export function initPWA() {
       setInterval(check, 60 * 60 * 1000);
     }
   });
-  // Ask the browser not to evict our IndexedDB / caches.
-  navigator.storage?.persist?.().catch(() => {});
 }
 
 export function useNeedRefresh(): [boolean, () => void] {

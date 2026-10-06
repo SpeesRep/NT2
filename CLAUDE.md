@@ -6,7 +6,7 @@ learner). Code copied from Fanki on 2026-10-06 without history; technical names 
 
 **Core rule: no data collection.** All progress stays on the device; the app only fetches the word list.
 Work in progress (phases): 1 repo/rename/config ✓ · 2 static content.json ✓ · 3 progress export/import +
-storage.persist · 4 multiple groups (design first). Sections below that still talk about syncing reviews to the
+storage.persist ✓ · 4 multiple groups (design first). Sections below that still talk about syncing reviews to the
 Sheet, Log/Progress or "her" are inherited from Fanki and outdated where they contradict this header.
 
 ## Content publishing (no data collection)
@@ -130,9 +130,17 @@ editor; then `--remove`). No LEARNER_TOKEN: students never call Apps Script. Git
   Settings, her userSettings and `hasVoice`. `new_per_day` there is already `getNewPerDay(sheet, user)`;
   `listening` = voice && her toggle; `listenMode()` (src/tts.ts) decides listening cards. Components never read
   `state.settings` / `state.userSettings` directly (`useSettingControls()` / `setUserSetting()` for the page).
-- JSON backup (same page; `src/backup.ts`): export = progress, unsent reviews, 🚩 flags, intro, doneToday,
-  dayCounts, studyTags, userSettings (no cards). Import MERGES (newer progress/flag wins, reviews added, today's
-  records only from today) and refuses files of the other app (DEV/PROD). iPhone: share sheet; else a download.
+- JSON backup (same page; `src/backup.ts`) — the ONLY way progress leaves a device, and only when the learner shares
+  the file. Export = progress, 🚩 flags, intro, doneToday, dayCounts, studyTags, userSettings, curriculumOpened (no
+  cards; no review outbox since SpeesRep). iPhone: share sheet ("Bewaar in Bestanden"); else a download.
+  Import: `readBackupFile` (≤ 5 MB, JSON) → `checkBackup` (app `speesrep`, version 1, same `ns` DEV/PROD; every
+  progress/flag record validated by `validProgress`/`validFlag`, invalid ones left out and counted, a file with only
+  invalid ones refused) → `previewBackup` counts add/replace/keep → when it would REPLACE progress here, an in-app
+  "Back-up terugzetten?" sheet (Vervangen / Annuleren) asks first → `importBackup` MERGES in one transaction (newer
+  record wins). e2e test 4 covers save → fresh device → restore → ask → replace.
+- `src/storage.ts`: `persistStorage()` at the first start (main.tsx; again on later starts while not granted);
+  `usePersisted()` → the Back-up section shows "Bewaar soms een back-up" or, when the browser may clear the data,
+  "Let op: de browser kan je voortgang wissen".
 
 ## OpenMoji pictures (emoji cards)
 

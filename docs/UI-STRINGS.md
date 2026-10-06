@@ -57,7 +57,14 @@ She sees **nl**. **fr** is hidden help: shown only in the "Hulp" panel and the o
 | `backup.title` | Back-up | Sauvegarde |
 | `backup.save` | Back-up opslaan | Enregistrer une sauvegarde (fichier) |
 | `backup.load` | Back-up terugzetten | Restaurer une sauvegarde (fichier) |
-| `backup.done` | Back-up teruggezet. | Sauvegarde restaurée. |
+| `backup.done` | Back-up teruggezet: {n} kaarten. | Sauvegarde restaurée : progression de {n} cartes reprise. |
+| `backup.skipped` | {n} delen van de back-up zijn niet goed. Die blijven weg. | {n} éléments de la sauvegarde sont abîmés : ils sont ignorés. |
+| `backup.confirmTitle` | Back-up terugzetten? | Restaurer la sauvegarde ? |
+| `backup.confirm` | De back-up vervangt je voortgang van {n} kaarten op dit toestel. Nieuwere voortgang blijft. | La sauvegarde remplace ta progression pour {n} cartes sur cet appareil. Une progression plus récente est gardée. |
+| `backup.replace` | Vervangen | Remplacer |
+| `backup.cancel` | Annuleren | Annuler |
+| `backup.note` | Je voortgang staat alleen op dit toestel. Bewaar soms een back-up. | Ta progression est seulement sur cet appareil. Enregistre parfois une sauvegarde (fichier). |
+| `backup.notPersisted` | Let op: de browser kan je voortgang wissen. Bewaar vaak een back-up. | Attention : le navigateur peut effacer ta progression. Enregistre souvent une sauvegarde. |
 | `backup.bad` | Dit is geen SpeesRep-back-up. | Ce fichier n’est pas une sauvegarde SpeesRep. |
 | `backup.otherApp` | Deze back-up is van een andere versie van de app. | Cette sauvegarde vient d’une autre version de l’appli (DEV/PROD). |
 | `progress.learned` | kaarten geoefend (van {n}) | cartes déjà travaillées (sur {n} en tout) |
