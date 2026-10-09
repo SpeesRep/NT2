@@ -9,6 +9,7 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:4174',
     serviceWorkers: 'allow',
+    screenshot: 'only-on-failure',
     ...devices['iPhone SE'],
     // Chromium engine with an iPhone viewport: service workers + offline emulation work reliably here.
     browserName: 'chromium',

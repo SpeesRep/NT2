@@ -77,6 +77,14 @@ jobs:
           npx playwright install --with-deps chromium
           npm run e2e
 
+      - name: E2E failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: e2e-results
+          path: main/test-results/
+          retention-days: 3
+
       - name: PROD — install, build
         if: steps.release.outputs.exists == 'true'
         working-directory: release
