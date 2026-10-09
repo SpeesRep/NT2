@@ -6,10 +6,11 @@ learner). Code copied from Fanki on 2026-10-06 without history; technical names 
 
 **Core rule: no data collection.** All progress stays on the device; the app only fetches the word list.
 Work in progress: first setup (repo, content.json, backups) ✓, then the multi-group spec ("SpeesRep — multi-group
-architecture", Claude Docs): 1 lock down + sheet v2 ✓ (DEV) · 2 API with teacher keys · 3 publishing per group, no
+architecture", Claude Docs): 1 lock down + sheet v2 ✓ · 2 API with teacher keys ✓ (docs/API.md) · 3 publishing per group, no
 commits · 4 student app: group code, help languages · 5 /docent/ teacher page · 6 card workflow. Sheet v2:
 docs/SHEET.md › v2. The old Apps Script pages are OWNER-ONLY (teacherAccess MYSELF) until /docent/ replaces them.
-Admin actions: GitHub workflow "Admin action" (admin.yml) — no admin token on this machine. Sections below that still talk about syncing reviews to the
+Owner actions: `node scripts/admin.mjs <env> <action>` with the admin key in .env.local (ADMIN_KEY_DEV|PROD; the server
+keeps only its SHA-256), or the GitHub workflow "Admin action" (admin.yml, secret ADMIN_KEY_<ENV>). Sections below that still talk about syncing reviews to the
 Sheet, Log/Progress or "her" are inherited from Fanki and outdated where they contradict this header.
 
 ## Content publishing (no data collection)
