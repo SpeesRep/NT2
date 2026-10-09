@@ -57,6 +57,7 @@ function teacherAction_(t, action, body) {
   switch (action) {
     case 'me': return teacherMe_(t);
     case 'inbox': return teacherInbox_(t, body.group);
+    case 'groupCards': return teacherGroupCards_(t, body.group);
     case 'reviewCards': return teacherReviewCards_(t, body.group, body.decisions);
     case 'getCurriculum': return teacherGetCurriculum_(t, body.group);
     case 'saveCurriculum': return teacherSaveCurriculum_(t, body.group, body.rows, body.version);

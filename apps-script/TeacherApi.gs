@@ -34,6 +34,16 @@ function teacherInbox_(t, code) {
   return { group: groupJson_(g), cards: cards };
 }
 
+/** groupCards: the group's accepted and hidden cards (to look back, or to un-hide one). */
+function teacherGroupCards_(t, code) {
+  var g = requireGroup_(t, code);
+  var gc = readGroupCards_()[g.group_code] || {}, tr = readTranslations_();
+  var cards = readTable_(sheet_('Cards')).rows
+    .filter(function (r) { var st = gc[String(r.id)]; return cardServed_(r) && (st === 'accepted' || st === 'hidden'); })
+    .map(function (r) { var c = teacherCard_(r, tr[String(r.id)], g); c.group_status = gc[String(r.id)]; return c; });
+  return { group: groupJson_(g), cards: cards };
+}
+
 /**
  * reviewCards: decisions = [{card_id, status: 'accepted' | 'hidden'}] for cards that are in this group's GroupCards
  * (inbox, accepted or hidden) and approved in the bank. Other ids are reported, never added.

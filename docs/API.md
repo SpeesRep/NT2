@@ -24,6 +24,7 @@ and assigned to the teacher in `GroupTeachers` (`requireGroup_`).
 |---|---|---|
 | `me` | — | `{label, groups:[{code, display_name, languages}]}` |
 | `inbox` | `group` | approved cards waiting for this group (GroupCards inbox), with translations in the group's languages |
+| `groupCards` | `group` | the group's accepted and hidden cards (`group_status`), to look back or un-hide |
 | `reviewCards` | `group, decisions:[{card_id, status: accepted\|hidden}]` | `{done, refused}`; only cards already in this group's GroupCards |
 | `getCurriculum` | `group` | `{rows, version, topics:[{tag, label, cards, bank}], known}` |
 | `saveCurriculum` | `group, rows, version` | `{ok, version}`, or `{conflict:true}` when a colleague saved first, or `{checks}` (validation errors) |

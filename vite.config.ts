@@ -70,15 +70,17 @@ export default defineConfig(({ mode, command }) => {
           cacheId: isProd ? 'speesrep-prod' : 'speesrep-dev',
           globPatterns: ['**/*.{js,css,html,svg,png,webmanifest}'],
           // PROD's worker (scope /NT2/) must never answer for the DEV app under /NT2/dev/.
-          globIgnores: isProd ? ['dev/**', 'icons/dev/**'] : ['icons/prod/**'],
+          globIgnores: isProd ? ['dev/**', 'icons/dev/**', 'docent/**'] : ['icons/prod/**', 'docent/**'],
           navigateFallback: `${base}index.html`,
+          // The teacher page (/docent/, vite.docent.config.ts) is a separate app: never answered with the student app.
           // Group install pages (/g/<code>/) carry their OWN manifest (start_url with the code): the worker must never
           // answer them with the app shell, or "Zet op beginscherm" would install the app without the code.
-          navigateFallbackDenylist: isProd ? [/\/dev\//, /\/g\//] : [/\/g\//],
+          navigateFallbackDenylist: isProd ? [/\/dev\//, /\/g\//, /\/docent\//] : [/\/g\//, /\/docent\//],
           // Fonts for non-Latin help languages: a runtime cache (src/fonts.ts can drop single files), never precached.
           runtimeCaching: [
             {
-              urlPattern: ({ url }) => url.pathname.startsWith(`${base}fonts/`),
+              // A RegExp, not a function: the function would be copied into sw.js without `base` (ReferenceError).
+              urlPattern: new RegExp(`${base.replace(/\//g, '\\/')}fonts\\/`),
               handler: 'CacheFirst',
               options: { cacheName: `${isProd ? 'speesrep-prod' : 'speesrep-dev'}-fonts` }
             }
