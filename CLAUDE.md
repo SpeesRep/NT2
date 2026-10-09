@@ -6,8 +6,8 @@ learner). Code copied from Fanki on 2026-10-06 without history; technical names 
 
 **Core rule: no data collection.** All progress stays on the device; the app only fetches the word list.
 Work in progress: first setup (repo, content.json, backups) ✓, then the multi-group spec ("SpeesRep — multi-group
-architecture", Claude Docs): 1 lock down + sheet v2 ✓ · 2 API with teacher keys ✓ (docs/API.md) · 3 publishing per group, no
-commits · 4 student app: group code, help languages · 5 /docent/ teacher page · 6 card workflow. Sheet v2:
+architecture", Claude Docs): 1 lock down + sheet v2 ✓ · 2 API with teacher keys ✓ (docs/API.md) · 3 publishing per group,
+no commits ✓ · 4 student app: group code, help languages ✓ · 5 /docent/ teacher page · 6 card workflow. Sheet v2:
 docs/SHEET.md › v2. The old Apps Script pages are OWNER-ONLY (teacherAccess MYSELF) until /docent/ replaces them.
 Owner actions: `node scripts/admin.mjs <env> <action>` with the admin key in .env.local (ADMIN_KEY_DEV|PROD; the server
 keeps only its SHA-256), or the GitHub workflow "Admin action" (admin.yml, secret ADMIN_KEY_<ENV>). Sections below that still talk about syncing reviews to the
@@ -27,8 +27,28 @@ Sheet, Log/Progress or "her" are inherited from Fanki and outdated where they co
   writes `/NT2/g/<code>/content.json` (PROD) and `/NT2/dev/g/<code>/content.json` (DEV) for every group: the approved
   cards the group accepted that belong to its curriculum (also dicht rows), translations in its languages, its
   curriculum, tags, settings; `{format, code, active:false}` for an inactive group. Validation (ids stable/unique/not
-  word-derived, codes, env) stops the deploy, so the live files stay. `version` = sha256 of the content. TRANSITIONAL
-  until phase 4: the first active group's list is also written to `<siteDir>/content.json` for the current app.
+  word-derived, codes, env) stops the deploy, so the live files stay. `version` = sha256 of the content. For every
+  active group also the install page `/g/<code>/index.html` (the built app, `groupPage`) + `manifest.webmanifest`
+  whose start_url/id = `<base>?groep=<code>` (iPhone: a Home Screen app has its own storage, so the code must come
+  from the manifest). The service worker never answers `/g/` navigations (navigateFallbackDenylist).
+
+## Student app: group code and help language (spec phase 4)
+
+- No default group: without `meta.groupCode` the app shows "Je groep" (src/screens/JoinScreen.tsx). A code (8
+  characters, src/group.ts) comes from typing it, a join link `?groep=<code>` (the address bar is cleaned) or a group
+  page `/g/<code>/`. It is checked by GETting `g/<code>/content.json` (404 = unknown, `{active:false}` = stopped).
+  Joining another group keeps progress (by card) and resets the curriculum latch and topic choice (`joinGroup`).
+- Stopped / vanished group: the cards and progress stay, practising goes on, a banner says so (`GroupBanner`).
+- Help language (src/helpLang.ts, src/language.ts): chosen on first start from the group's `languages` (or none),
+  changeable in Instellingen; stored only on the device (`meta.helpLang`, '' = none). Cards keep ALL the group's
+  translations (`card.translations`); `withHelpLang` maps the chosen one to `card.help` / `help_example` (offline
+  switching). Without a help text: a question card is left out, a word has no FR→NL direction (`tracksFor`). The
+  Hulp panel, rating overlay (HELP / RATINGS have `fr` and `en`) and topic names (`Tag.labels`, TagTranslations)
+  follow the language. Every text element has `lang` + `dir="auto"`.
+- Fonts for non-Latin scripts (src/fonts.ts): none shipped yet. Put subsets in public/fonts/ + FONT_FILES; the app
+  fetches all of the group's script fonts, then drops the unneeded ones from its runtime cache (`<ns>-fonts`, never
+  the precache) and registers the chosen one with document.fonts (CSP: fonts from this site only).
+- Backups also carry `groupCode` and `helpLang` (restored only on a device that has none).
 - "Publiceren" = a tile on the teacher Start page (apps-script/Publish.gs `reviewPublish`): POSTs the
   repository_dispatch with Script Property `GITHUB_DISPATCH_TOKEN` (fine-grained token, SpeesRep/NT2 only,
   Contents: Read and write). A sheet menu is impossible: the projects are standalone, not bound to the sheets.
