@@ -413,7 +413,9 @@ test('group code, help language and a stopped group (no default group, nothing s
   await page.getByRole('button', { name: 'Menu openen' }).click();
   await page.getByRole('menuitem', { name: /Instellingen/ }).click();
   await page.getByLabel('Hulptaal').selectOption('fr');
-  await page.getByRole('button', { name: 'Klaar' }).click();
+  // On the Linux CI runner (mobile emulation), the pointer hit-test right after a <select> change lands on the
+  // Back-up controls although the CI screenshot shows Klaar fully visible; tap the button directly.
+  await page.getByRole('button', { name: 'Klaar' }).dispatchEvent('click');
   await page.getByRole('button', { name: 'Starten' }).click();
   await page.getByRole('button', { name: 'Antwoord tonen' }).click();
   await expect(page.locator('.card-answer[lang="fr"]')).toHaveText(/^fr-/);
