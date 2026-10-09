@@ -497,6 +497,11 @@ body {
   padding-bottom: 8px;
 }
 
+/* Sections never shrink below their content: otherwise a long screen (Instellingen) overlaps the Klaar button. */
+.topics > * {
+  flex-shrink: 0;
+}
+
 .screen-title {
   font-size: 24px;
   margin: 4px 0;
