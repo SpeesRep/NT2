@@ -22,3 +22,4 @@ backups/
 # Teacher word lists (copyrighted source material; never commit)
 docs/klim-op-*.csv
 docs/openmoji-*.csv
+*.local.txt
