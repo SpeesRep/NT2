@@ -90,20 +90,21 @@ function teacherGetCurriculum_(t, code) {
 
 /**
  * saveCurriculum: saves the rows only when `version` is still the group's version (else conflict: a colleague
- * saved first) and the shared validation passes. Returns {ok, version, checks} | {ok:false, conflict} | {ok:false, checks}.
+ * saved first) and the shared validation passes. Returns {saved:true, version, checks} | {saved:false, conflict:true,
+ * version} | {saved:false, checks}. (`ok` is the envelope's and always true here: see handle_.)
  */
 function teacherSaveCurriculum_(t, code, rows, version) {
   var g = requireGroup_(t, code);
   return withLock_(function () {
     var ss = ss_(), sh = ss.getSheetByName('Curriculum');
     var current = curriculumVersionNumber_(sh, g.group_code);
-    if (Number(version) !== current) return { ok: false, conflict: true, version: current };
+    if (Number(version) !== current) return { saved: false, conflict: true, version: current };
     var info = editorTagInfo_(ss, g.group_code);
     var plan = curriculumSavePlan_(rows, info.keys, info.counts);
-    if (!plan.ok) return { ok: false, checks: plan.checks };
+    if (!plan.ok) return { saved: false, checks: plan.checks };
     writeCurriculumTab_(sh, plan.rows.map(function (r) { return curriculumSheetValues_(r, g.group_code, current + 1); }), g.group_code);
     audit_(t.teacher_id, 'saveCurriculum', g.group_code);
-    return { ok: true, version: current + 1, checks: plan.checks };
+    return { saved: true, version: current + 1, checks: plan.checks };
   });
 }
 

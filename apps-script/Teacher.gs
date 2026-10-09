@@ -157,9 +157,10 @@ function validateCard_(c) {
 }
 
 /**
- * The card's status (caller holds the lock). approved: its translations become reviewed and — until teachers accept
- * cards on /docent/ (spec phase 6) — it is accepted in the owner's default group, so students get it at the next
- * Publiceren. draft / rejected: the card leaves every group's content at the next Publiceren (its GroupCards rows stay).
+ * The card's status (caller holds the lock). approved: its translations become reviewed and it lands in the INBOX of
+ * the owner's default group (spec › card workflow step 4; the teacher accepts or hides it on /docent/). A card the
+ * group already has (accepted / hidden) keeps that status. draft / rejected: the card leaves every group's content
+ * at the next Publiceren (its GroupCards rows stay).
  */
 function setCardStatus_(sh, row, status) {
   sh.getRange(row._row, headersOf_(sh).indexOf('status') + 1).setValue(status);
@@ -167,9 +168,8 @@ function setCardStatus_(sh, row, status) {
   setTranslationsStatus_(String(row.id), 'reviewed');
   var code = defaultGroup_().group_code, gc = sheet_('GroupCards');
   var hit = readTable_(gc).rows.filter(function (r) { return r.group_code === code && String(r.card_id) === String(row.id); })[0];
-  var values = [rowFromObject_(SCHEMA.GroupCards, { group_code: code, card_id: String(row.id), status: 'accepted', updated: new Date() })];
-  if (!hit) gc.getRange(nextRow_(gc, 1), 1, 1, SCHEMA.GroupCards.length).setValues(values);
-  else if (hit.status !== 'accepted') gc.getRange(hit._row, 1, 1, SCHEMA.GroupCards.length).setValues(values);
+  if (!hit) gc.getRange(nextRow_(gc, 1), 1, 1, SCHEMA.GroupCards.length)
+    .setValues([rowFromObject_(SCHEMA.GroupCards, { group_code: code, card_id: String(row.id), status: 'inbox', updated: new Date() })]);
 }
 
 // ---------- called from the page (google.script.run) ----------

@@ -7,7 +7,7 @@ learner). Code copied from Fanki on 2026-10-06 without history; technical names 
 **Core rule: no data collection.** All progress stays on the device; the app only fetches the word list.
 Work in progress: first setup (repo, content.json, backups) ✓, then the multi-group spec ("SpeesRep — multi-group
 architecture", Claude Docs): 1 lock down + sheet v2 ✓ · 2 API with teacher keys ✓ (docs/API.md) · 3 publishing per group,
-no commits ✓ · 4 student app: group code, help languages ✓ · 5 /docent/ teacher page · 6 card workflow. Sheet v2:
+no commits ✓ · 4 student app: group code, help languages ✓ · 5 /docent/ teacher page ✓ · 6 card workflow. Sheet v2:
 docs/SHEET.md › v2. The old Apps Script pages are OWNER-ONLY (teacherAccess MYSELF) until /docent/ replaces them.
 Owner actions: `node scripts/admin.mjs <env> <action>` with the admin key in .env.local (ADMIN_KEY_DEV|PROD; the server
 keeps only its SHA-256), or the GitHub workflow "Admin action" (admin.yml, secret ADMIN_KEY_<ENV>). Sections below that still talk about syncing reviews to the
@@ -31,6 +31,21 @@ Sheet, Log/Progress or "her" are inherited from Fanki and outdated where they co
   active group also the install page `/g/<code>/index.html` (the built app, `groupPage`) + `manifest.webmanifest`
   whose start_url/id = `<base>?groep=<code>` (iPhone: a Home Screen app has its own storage, so the code must come
   from the manifest). The service worker never answers `/g/` navigations (navigateFallbackDenylist).
+
+## Teacher page /docent/ (spec phase 5)
+
+- A separate small Preact app (`docent/`, `vite.docent.config.ts`; built by build:prod / build:dev after the student
+  app into `dist/docent` / `dist/dev/docent`). Never linked from the student app, never precached (globIgnores +
+  navigateFallbackDenylist). Own CSP: this site + `script.google.com` / `script.googleusercontent.com` only;
+  `referrer: no-referrer`, `robots: noindex`.
+- Login = the invite link `…/docent/#key=<key>` (admin.createTeacher / admin.reissueKey). The key is stored in that
+  browser (localStorage), removed from the address bar, sent in every POST body; a new link in the same tab reloads.
+  Unknown/revoked key → "Deze link werkt niet (meer)".
+- Tabs: Inbox (accept / hide / report a mistake → Proposals), Kaarten (accepted + hidden, un-hide), Curriculum (order,
+  rules, add a topic; version conflict → nothing overwritten), Leerlingen uitnodigen (QR code drawn with
+  qrcode-generator — no outside service — of the group page `/g/<code>/`, link, code, print), Publiceren, Woord
+  voorstellen. Every action is checked on the server (docs/API.md). e2e/docent.spec.ts mocks the API.
+- Interim until phase 6: a draft the owner approves on the owner page lands in the default group's Inbox.
 
 ## Student app: group code and help language (spec phase 4)
 

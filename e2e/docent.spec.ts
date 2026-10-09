@@ -28,7 +28,7 @@ test('teacher page: key login, inbox, curriculum with a colleague conflict, invi
           rows: [{ order: 1, tag: 'huishouden', rule: 'always', date: '', percentage: null, from_tags: [] }] });
       case 'saveCurriculum':
         saves++;
-        return saves === 1 ? ok({ ok: false, conflict: true, version: 2 }) : ok({ version: 2, checks: [] });
+        return saves === 1 ? ok({ saved: false, conflict: true, version: 2 }) : ok({ saved: true, version: 2, checks: [] });
       case 'joinInfo': return ok({ group: GROUP, code: GROUP.code, link: `/NT2/dev/?groep=${GROUP.code}`, page: `/NT2/dev/g/${GROUP.code}/` });
       default: return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ ok: false, error: 'forbidden', message: 'nope' }) });
     }
@@ -44,7 +44,7 @@ test('teacher page: key login, inbox, curriculum with a colleague conflict, invi
   // Inbox: both translations, accept one, accept the rest.
   await expect(page.getByText('fr-huis')).toBeVisible();
   await expect(page.getByText('en-huis')).toBeVisible();
-  await page.getByRole('button', { name: 'Accepteren' }).first().click();
+  await page.getByRole('button', { name: 'Accepteren', exact: true }).first().click();
   await expect(page.getByText('1 geaccepteerd')).toBeVisible();
   expect(calls.find((c) => c.action === 'reviewCards')?.body).toMatchObject({ group: GROUP.code, decisions: [{ card_id: 'c_1', status: 'accepted' }] });
 
@@ -54,6 +54,10 @@ test('teacher page: key login, inbox, curriculum with a colleague conflict, invi
   await page.getByRole('button', { name: 'Opslaan' }).click();
   await expect(page.getByText('Een collega heeft dit intussen veranderd')).toBeVisible();
   expect(calls.filter((c) => c.action === 'saveCurriculum')[0].body).toMatchObject({ version: 1, group: GROUP.code });
+  await page.getByRole('button', { name: 'Opnieuw laden' }).click();
+  await page.getByLabel('Onderwerp toevoegen').selectOption('reizen');
+  await page.getByRole('button', { name: 'Opslaan' }).click();
+  await expect(page.getByText('Opgeslagen.')).toBeVisible();
 
   // Invite: QR code (drawn on the page) + the group page link.
   await page.getByRole('tab', { name: 'Leerlingen uitnodigen' }).click();

@@ -27,7 +27,7 @@ and assigned to the teacher in `GroupTeachers` (`requireGroup_`).
 | `groupCards` | `group` | the group's accepted and hidden cards (`group_status`), to look back or un-hide |
 | `reviewCards` | `group, decisions:[{card_id, status: accepted\|hidden}]` | `{done, refused}`; only cards already in this group's GroupCards |
 | `getCurriculum` | `group` | `{rows, version, topics:[{tag, label, cards, bank}], known}` |
-| `saveCurriculum` | `group, rows, version` | `{ok, version}`, or `{conflict:true}` when a colleague saved first, or `{checks}` (validation errors) |
+| `saveCurriculum` | `group, rows, version` | `{saved:true, version}`, or `{saved:false, conflict:true}` when a colleague saved first, or `{saved:false, checks}` (validation errors) |
 | `propose` | `group, proposal:{type:new, nl, example_nl?, note?}` or `{type:correction, card_id, note}` | `{proposal_id}` |
 | `joinInfo` | `group` | `{code, link: …/?groep=<code>, page: …/g/<code>/}` |
 | `publish` | `group` | repository_dispatch to GitHub (whole site); max 4 per group per hour |

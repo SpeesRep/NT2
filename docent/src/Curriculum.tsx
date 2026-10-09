@@ -51,11 +51,11 @@ export function Curriculum({ group }: { group: Group }) {
     setBusy(true);
     setMsg('');
     try {
-      const r = await call<{ ok: boolean; version?: number; conflict?: boolean; checks?: Check[] }>('saveCurriculum', {
+      const r = await call<{ saved: boolean; version?: number; conflict?: boolean; checks?: Check[] }>('saveCurriculum', {
         group: group.code, version: data.version, rows: rows.map((x, i) => ({ ...x, order: i + 1 }))
       });
       if (r.conflict) setConflict(true);
-      else if (!r.ok) {
+      else if (!r.saved) {
         setChecks(r.checks ?? []);
         setMsg('Niet opgeslagen: verbeter eerst de rode punten.');
       } else {

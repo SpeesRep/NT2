@@ -297,7 +297,7 @@ function render() {
     o[0].text = 'Nog niet goedgekeurd (' + c.unchecked + ')';
     o[1].text = 'Goedgekeurd (' + c.approved + ')'; o[2].text = 'Afgekeurd (' + c.rejected + ')'; o[3].text = 'Alle kaarten (' + c.all + ')';
   }
-  if (S.boot) $('gate').textContent = S.boot.requireApproval ? 'Goedgekeurde kaarten gaan bij Publiceren naar de groep.'
+  if (S.boot) $('gate').textContent = S.boot.requireApproval ? 'Goedgekeurde kaarten gaan naar de Inbox van de groep. De docent accepteert ze op de docentenpagina.'
     : 'Let op: require_approval staat uit, dus de app krijgt alle actieve kaarten (ook niet goedgekeurde).';
   if (S.source === 'cards') $('pageInfo').textContent = 'kaarten ' + (S.cards.offset + 1) + '–' + Math.min(S.cards.offset + 50, S.cards.total) + ' van ' + S.cards.total;
   // Keep the cursor where it was if a redraw happens while typing.
