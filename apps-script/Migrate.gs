@@ -11,7 +11,8 @@
 //   - Settings: require_approval is removed (only approved cards reach a group now).
 //   - The Fanki tabs Inbox, Progress, Log, Dashboard, UserInfo are NOT deleted here (Inbox is hidden): Progress and
 //     Log hold the Fanki learner's data — removing them is a separate, explicit step (deleteTabs).
-// Running it again on a v2 sheet changes nothing (reports already_v2).
+// Resumable: it reads the v1 data from the v1_ backups once they exist, rewrites every v2 tab completely, and only
+// the last step sets Script Property MIGRATED_V2. After that a run changes nothing (reports already_v2).
 
 var V2_GROUP_NAME = 'Groep Zon';
 var V2_INSTITUTION_LABEL = 'Eerste instelling';
@@ -44,17 +45,25 @@ function v1ToV2_(r, fromInbox) {
   return { card: card, fr: fr, gloss: gloss };
 }
 
+/** Clears a tab completely — values, formats AND validation rules (clear() keeps those) — and writes the header. */
+function resetTab_(sh, headers) {
+  sh.clear();
+  sh.getRange(1, 1, sh.getMaxRows(), sh.getMaxColumns()).clearDataValidations();
+  sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+  return sh;
+}
+
 function adminMigrateV2_(dryRun) {
   return withLock_(function () {
     var ss = ss_();
+    if (props_().getProperty('MIGRATED_V2')) return { already_v2: props_().getProperty('MIGRATED_V2'), groups: readGroups_() };
+    // The v1 data: from the backups when an earlier (interrupted) run made them, else from the live tabs.
+    var src = function (name) { return ss.getSheetByName('v1_' + name) || ss.getSheetByName(name); };
     var cardsSh = ss.getSheetByName('Cards');
-    var cardHeaders = headersOf_(cardsSh);
-    if (cardHeaders.indexOf('status') !== -1 && cardHeaders.indexOf('controle') === -1 && ss.getSheetByName('Groups')) {
-      return { already_v2: true, groups: readGroups_() };
-    }
-    var cards = readTable_(cardsSh).rows.filter(function (r) { return String(r.id).trim() || String(r.nl).trim(); });
+    if (headersOf_(src('Cards')).indexOf('status') !== -1) throw apiError_('not_v1', 'Cards has no v1 data (no v1_Cards backup).');
+    var cards = readTable_(src('Cards')).rows.filter(function (r) { return String(r.id).trim() || String(r.nl).trim(); });
     var inboxSh = ss.getSheetByName('Inbox');
-    var inbox = inboxSh ? readTable_(inboxSh).rows.filter(function (r) { return String(r.nl).trim(); }) : [];
+    var inbox = src('Inbox') ? readTable_(src('Inbox')).rows.filter(function (r) { return String(r.nl).trim(); }) : [];
 
     var seen = {}, renamed = [], out = [], glosses = [];
     var add = function (r, fromInbox) {
@@ -75,7 +84,7 @@ function adminMigrateV2_(dryRun) {
     var count = { draft: 0, approved: 0, rejected: 0 };
     out.forEach(function (m) { count[m.card.status]++; });
     var translations = out.filter(function (m) { return m.fr.text || m.fr.example; });
-    var curriculum = readTable_(ss.getSheetByName('Curriculum')).rows
+    var curriculum = readTable_(src('Curriculum')).rows
       .filter(function (r) { return String(r.tag).trim() || String(r.regel).trim(); });
     var settings = readTable_(ss.getSheetByName('Settings')).rows;
     var code = newGroupCode_();
@@ -88,6 +97,7 @@ function adminMigrateV2_(dryRun) {
       group: { group_code: code, display_name: V2_GROUP_NAME, languages: HELP_LANGS.join(','), accepted_cards: count.approved },
       curriculum_rows: curriculum.length,
       settings_removed: settings.filter(function (r) { return OBSOLETE_SETTINGS.indexOf(String(r.key).trim()) !== -1; }).map(function (r) { return r.key; }),
+      resumed_from_backups: !!ss.getSheetByName('v1_Cards'),
       fanki_tabs_left: V1_TABS.filter(function (n) { return ss.getSheetByName(n); }).map(function (n) {
         return n + ' (' + Math.max(0, ss.getSheetByName(n).getLastRow() - 1) + ' rows)';
       })
@@ -106,8 +116,7 @@ function adminMigrateV2_(dryRun) {
     if (oldBackup) ss.deleteSheet(oldBackup);
 
     // 2. Cards: rewrite the tab with the v2 columns.
-    cardsSh.clear();
-    cardsSh.getRange(1, 1, 1, CARD_COLS.length).setValues([CARD_COLS]);
+    resetTab_(cardsSh, CARD_COLS);
     if (out.length) {
       cardsSh.getRange(2, 1, out.length, CARD_COLS.length)
         .setValues(out.map(function (m) { return rowFromObject_(CARD_COLS, m.card); }));
@@ -115,12 +124,7 @@ function adminMigrateV2_(dryRun) {
 
     // 3. New tabs.
     var now = new Date();
-    var tab = function (name) {
-      var sh = ss.getSheetByName(name) || ss.insertSheet(name);
-      sh.clear();
-      sh.getRange(1, 1, 1, SCHEMA[name].length).setValues([SCHEMA[name]]);
-      return sh;
-    };
+    var tab = function (name) { return resetTab_(ss.getSheetByName(name) || ss.insertSheet(name), SCHEMA[name]); };
     var put = function (sh, name, rows) {
       if (rows.length) sh.getRange(2, 1, rows.length, SCHEMA[name].length).setValues(rows.map(function (o) { return rowFromObject_(SCHEMA[name], o); }));
     };
@@ -145,11 +149,10 @@ function adminMigrateV2_(dryRun) {
       return { group_code: code, order: r.order, tag: r.tag, regel: r.regel, datum: r.datum, percentage: r.percentage,
         van_tags: r.van_tags, version: 1 };
     });
-    curSh.clear();
-    curSh.getRange(1, 1, 1, SCHEMA.Curriculum.length).setValues([SCHEMA.Curriculum]);
+    resetTab_(curSh, SCHEMA.Curriculum);
     put(curSh, 'Curriculum', curRows);
 
-    // 5. Settings without the obsolete keys.
+    // 5. Settings without the obsolete keys (the live tab: a key removed by an earlier run stays removed).
     var setSh = ss.getSheetByName('Settings');
     readTable_(setSh).rows.filter(function (r) { return OBSOLETE_SETTINGS.indexOf(String(r.key).trim()) !== -1; })
       .sort(function (a, b) { return b._row - a._row; }).forEach(function (r) { setSh.deleteRow(r._row); });
@@ -158,7 +161,7 @@ function adminMigrateV2_(dryRun) {
     applyV2Formats_(ss);
     if (inboxSh) inboxSh.hideSheet();
     SpreadsheetApp.flush();
-    report.group.group_code = code;
+    props_().setProperty('MIGRATED_V2', new Date().toISOString());
     return report;
   });
 }
