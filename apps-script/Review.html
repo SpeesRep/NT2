@@ -17,7 +17,7 @@
 <main>
   <div class="bar">
     <select id="tagFilter"><option value="">Alle tags</option></select>
-    <input id="q" placeholder="Zoek (nl, fr, antwoord)…">
+    <input id="q" placeholder="Zoek (nl, fr, en, antwoord)…">
     <button class="btn" id="search">Zoeken</button>
     <span id="inboxBar"></span>
     <span class="bar" id="cardsBar" style="margin:0" hidden>
@@ -73,7 +73,7 @@ function applyFilter() {
   S.items = S.all.filter(function (x) {
     var q = S.q.trim().toLowerCase();
     return (!S.tag || x.tags.indexOf(S.tag) !== -1)
-      && (!q || (x.nl + ' ' + x.fr + ' ' + x.answer).toLowerCase().indexOf(q) !== -1);
+      && (!q || (x.nl + ' ' + x.fr + ' ' + x.en + ' ' + x.answer).toLowerCase().indexOf(q) !== -1);
   });
 }
 /** The one tag menu: every tag that has rows here (Inbox: counted on the page; Kaarten: counts from the server). */
@@ -94,7 +94,7 @@ function fillTagMenu() {
 var drafts = {}; // unsaved edits per card id: a redraw never throws away what the teacher is typing
 function formFor(item) {
   var f = drafts[item.id] || { type: item.type, nl: item.nl, article: item.article, pos: item.pos, fr: item.fr, example_nl: item.example_nl,
-            example_fr: item.example_fr, answer: item.answer, tags: item.tags.slice(), flags: item.flags.slice() };
+            example_fr: item.example_fr, en: item.en, example_en: item.example_en, answer: item.answer, tags: item.tags.slice(), flags: item.flags.slice() };
   drafts[item.id] = f;
   var row = function (label, input) { return [el('label', { text: label }), input]; };
   var inp = function (k, ph) { var i = el('input', { type: 'text', placeholder: ph || '', 'data-k': k }); i.value = f[k] || ''; i.addEventListener('input', function () { f[k] = i.value; }); return i; };
@@ -116,7 +116,8 @@ function formFor(item) {
   var tagLabels = {}; S.boot.tags.forEach(function (t) { tagLabels[t.tag] = t.label; }); // the subject's name (label_nl) only
   var grid = el('div', { 'class': 'grid' }, [].concat(
     row('type', typeSel), row('nl', inp('nl', 'Nederlands (enkel: de vraag/emoji)')), row('lidwoord', artSel), row('pos', inp('pos', 'zelfstandig naamwoord…')),
-    row('fr', inp('fr', 'Frans')), answerRow, row('example_nl', inp('example_nl')), row('example_fr', inp('example_fr')),
+    row('fr', inp('fr', 'Frans')), row('en', inp('en', 'Engels')), answerRow, row('example_nl', inp('example_nl')),
+    row('example_fr', inp('example_fr')), row('example_en', inp('example_en')),
     row('tags', chips(S.boot.tags.map(function (t) { return t.tag; }), 'tags', function (v) { return tagLabels[v]; })),
     row('flags', chips(S.boot.flags, 'flags'))
   ));
@@ -134,7 +135,7 @@ function validate(c) {
   if (!String(c.nl || '').trim()) errors.push('nl ontbreekt');
   if (!(c.tags || []).length) errors.push('kies minstens één onderwerp (tag)');
   if (type === 'oneway' && !String(c.answer || '').trim()) errors.push('answer ontbreekt (enkel)');
-  if (type !== 'oneway' && !String(c.fr || '').trim()) errors.push('fr ontbreekt');
+  if (type !== 'oneway' && !String(c.fr || '').trim() && !String(c.en || '').trim()) errors.push('vertaling ontbreekt (fr of en)');
   if (type === 'sentence' && !/\{[^}]+\}/.test(String(c.nl || ''))) errors.push('zin: zet het doelwoord tussen {accolades}');
   if (type === 'word' && /zelfstandig|noun/i.test(String(c.pos || '')) && c.article !== 'de' && c.article !== 'het') errors.push('zelfstandig naamwoord zonder de/het');
   return errors;
@@ -296,7 +297,7 @@ function render() {
     o[0].text = 'Nog niet goedgekeurd (' + c.unchecked + ')';
     o[1].text = 'Goedgekeurd (' + c.approved + ')'; o[2].text = 'Afgekeurd (' + c.rejected + ')'; o[3].text = 'Alle kaarten (' + c.all + ')';
   }
-  if (S.boot) $('gate').textContent = S.boot.requireApproval ? 'De app krijgt alleen goedgekeurde kaarten.'
+  if (S.boot) $('gate').textContent = S.boot.requireApproval ? 'Goedgekeurde kaarten gaan bij Publiceren naar de groep.'
     : 'Let op: require_approval staat uit, dus de app krijgt alle actieve kaarten (ook niet goedgekeurde).';
   if (S.source === 'cards') $('pageInfo').textContent = 'kaarten ' + (S.cards.offset + 1) + '–' + Math.min(S.cards.offset + 50, S.cards.total) + ' van ' + S.cards.total;
   // Keep the cursor where it was if a redraw happens while typing.

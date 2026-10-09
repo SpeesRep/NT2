@@ -1,0 +1,48 @@
+name: Admin action
+
+# Runs ONE admin action of the Apps Script API with the ADMIN_TOKEN_<ENV> secret, so nobody needs the token
+# locally. Manual only (Actions → Admin action → Run workflow, or `gh workflow run admin.yml -f env=dev
+# -f action=migrateV2 -f payload='{"dryRun":true}'`). Writing actions are dry runs unless the payload says
+# "dryRun": false. The result (JSON, never the token) is printed and added to the run summary.
+on:
+  workflow_dispatch:
+    inputs:
+      env:
+        description: Environment
+        type: choice
+        options: [dev, prod]
+        default: dev
+      action:
+        description: Admin action
+        type: choice
+        options: [migrateV2, groups, listCards, tags, readTab, deleteTabs, setSetting]
+        default: migrateV2
+      payload:
+        description: JSON payload (e.g. {"dryRun":false} or {"tab":"Groups"})
+        default: '{}'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: admin-${{ github.event.inputs.env }}
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: ${{ github.event.inputs.action }} on ${{ github.event.inputs.env }}
+        env:
+          API_URL_DEV: ${{ secrets.API_URL_DEV }}
+          API_URL_PROD: ${{ secrets.API_URL_PROD }}
+          ADMIN_TOKEN_DEV: ${{ secrets.ADMIN_TOKEN_DEV }}
+          ADMIN_TOKEN_PROD: ${{ secrets.ADMIN_TOKEN_PROD }}
+          PAYLOAD: ${{ github.event.inputs.payload }}
+        run: |
+          node scripts/admin.mjs "${{ github.event.inputs.env }}" "${{ github.event.inputs.action }}" "$PAYLOAD" | tee result.json
+          { echo '```json'; head -c 60000 result.json; echo; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

@@ -31,6 +31,19 @@ function json_(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+/** Cell → text. A time Sheets auto-converted (e.g. "7:15") comes back as "7:15", not a date. */
+function text_(v) {
+  if (v instanceof Date) {
+    return v.getFullYear() < 1901 ? Utilities.formatDate(v, tz_(), 'H:mm') : Utilities.formatDate(v, tz_(), 'yyyy-MM-dd');
+  }
+  return v == null ? '' : String(v);
+}
+
+/** Header row only (one small read). */
+function headersOf_(sh) {
+  return sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0].map(String);
+}
+
 function newId_(prefix) {
   return (prefix || 'c_') + Utilities.getUuid().replace(/-/g, '').slice(0, 10);
 }
@@ -93,12 +106,9 @@ function safeEquals_(a, b) {
   return diff === 0;
 }
 
-/** 'admin' | 'learner' | null */
+/** 'admin' | null. SpeesRep has no learner token: students never call the API. */
 function roleFor_(token) {
-  var p = props_();
-  if (safeEquals_(token, p.getProperty('ADMIN_TOKEN'))) return 'admin';
-  if (safeEquals_(token, p.getProperty('LEARNER_TOKEN'))) return 'learner';
-  return null;
+  return safeEquals_(token, props_().getProperty('ADMIN_TOKEN')) ? 'admin' : null;
 }
 
 function withLock_(fn) {
@@ -127,20 +137,18 @@ function nextRow_(sh, col) {
 // The sheet is in Dutch; the API speaks fixed codes. Both spellings are accepted when reading.
 var TYPE_NL = { word: 'dubbel', oneway: 'enkel', sentence: 'zin', question: 'vraag' };
 var TYPE_ALIASES = { woord: 'word', calc: 'oneway' }; // older sheet values, still read
-var STATUS_NL = { proposed: 'voorgesteld', approved: 'goedgekeurd' };
-var CHECK_NL = { approved: 'goedgekeurd', rejected: 'afgekeurd' }; // Cards.controle ('' = not checked yet)
-var CHECK_ALIASES = { gecontroleerd: 'approved' }; // value of the first version (2026-10-02)
-
-/** Cards.controle → 'approved' | 'rejected' | ''. */
-function checkCode_(v) {
+/** Cards.status → 'draft' | 'approved' | 'rejected' (Fanki's goedgekeurd/afgekeurd are read too; blank = draft). */
+function cardStatus_(v) {
   var s = String(v || '').trim().toLowerCase();
-  if (CHECK_NL[s]) return s;
-  return invert_(CHECK_NL)[s] || CHECK_ALIASES[s] || '';
+  if (CARD_STATUS.indexOf(s) !== -1) return s;
+  if (s === 'goedgekeurd' || s === 'gecontroleerd') return 'approved';
+  if (s === 'afgekeurd') return 'rejected';
+  return 'draft';
 }
 
-/** Does this Cards row go to the learner's app? Active, and approved when Settings.require_approval is on. */
-function cardServed_(r, requireApproval) {
-  return !!(String(r.id).trim() && bool_(r.active) && String(r.nl).trim() && (!requireApproval || checkCode_(r.controle) === 'approved'));
+/** Is this Cards row in the approved bank (active, with Dutch text)? Only these can reach a group. */
+function cardServed_(r) {
+  return !!(String(r.id).trim() && bool_(r.active) && String(r.nl).trim() && cardStatus_(r.status) === 'approved');
 }
 // Old English tag keys → Dutch keys (used by the one-time migration and to convert seed lines).
 var TAG_RENAME = { household: 'huishouden', family: 'familie', travel: 'reizen', food: 'eten', work: 'werk',
@@ -167,14 +175,6 @@ function typeCode_(v) {
   return invert_(TYPE_NL)[s] || TYPE_ALIASES[s] || '';
 }
 
-/** Sheet value → 'manual' | 'auto' | ''. */
-
-/** Inbox status (Dutch or English) → 'proposed' | 'approved' | ''. */
-function statusCode_(v) {
-  var s = String(v || '').trim().toLowerCase();
-  if (STATUS_NL[s]) return s;
-  return invert_(STATUS_NL)[s] || '';
-}
 
 function typeNl_(code) { return TYPE_NL[typeCode_(code)] || String(code || ''); }
 function posNl_(v) { var s = String(v || '').trim(); return POS_NL[s.toLowerCase()] || s; }

@@ -1,21 +1,31 @@
 // Sheet schema — keep in sync with docs/SHEET.md.
 
-var CARD_COLS = ['id', 'type', 'nl', 'article', 'pos', 'fr', 'example_nl', 'example_fr',
-  'tags', 'flags', 'answer', 'added', 'active']; // tags_source was removed on 2026-10-05
+// v2 (multi-group, 2026-10-09; docs/SHEET.md, spec "SpeesRep — multi-group architecture"). One Sheet per
+// environment, owner-only; relations go by id. Cards = the shared bank (no language-specific columns: help texts
+// live in Translations). Column order matters only for validation ranges (Layout.gs looks columns up by name).
+var CARD_COLS = ['id', 'type', 'nl', 'article', 'pos', 'example_nl', 'tags', 'flags', 'answer', 'added', 'active', 'status'];
+var CARD_STATUS = ['draft', 'approved', 'rejected']; // only approved cards can reach a group
+var TRANSLATION_STATUS = ['machine', 'reviewed'];
+var GROUP_CARD_STATUS = ['inbox', 'accepted', 'hidden']; // only accepted cards are published for that group
 
 var SCHEMA = {
-  // Cards only (last column): `controle` = the teacher's approval ('' = nog niet, goedgekeurd, afgekeurd);
-  // with Settings.require_approval only goedgekeurd cards go to the app. (The 🚩 `nakijken` column is gone since
-  // 2026-10-05: a card that needs another look goes to the Inbox.)
-  Cards: CARD_COLS.concat(['controle']),
-  Progress: ['card_id', 'track', 'state', 'due', 'stability', 'difficulty', 'reps', 'lapses', 'last_review'],
-  Log: ['event_id', 'card_id', 'track', 'ts', 'rating', 'mode', 'duration_ms', 'snapshot'],
+  Cards: CARD_COLS,
+  Translations: ['card_id', 'lang', 'text', 'example', 'status', 'updated'],
+  GroupCards: ['group_code', 'card_id', 'status', 'updated'],
+  Institutions: ['inst_id', 'label', 'active'],
+  Teachers: ['teacher_id', 'inst_id', 'label', 'key_hash', 'active', 'created'],
+  Groups: ['group_code', 'inst_id', 'display_name', 'languages', 'active', 'content_version'],
+  GroupTeachers: ['group_code', 'teacher_id'],
+  Curriculum: ['group_code', 'order', 'tag', 'regel', 'datum', 'percentage', 'van_tags', 'version'],
+  Proposals: ['proposal_id', 'group_code', 'teacher_id', 'type', 'card_id', 'nl', 'example_nl', 'note', 'status', 'created'],
+  AuditLog: ['timestamp', 'teacher_id', 'action', 'group_code'],
   Tags: ['tag', 'label_nl', 'label_fr', 'description', 'subject_nl'],
-  Inbox: CARD_COLS.concat(['status']),
-  Settings: ['key', 'value', 'description'],
-  Curriculum: ['order', 'tag', 'regel', 'datum', 'percentage', 'van_tags'],
-  Dashboard: ['metric', 'value']
+  Settings: ['key', 'value', 'description']
 };
+/** Fanki tabs that v2 no longer uses (student data and its views); the migration lists them, dropTabs removes. */
+var V1_TABS = ['Inbox', 'Progress', 'Log', 'Dashboard', 'UserInfo'];
+/** Help languages SpeesRep starts with (Groups.languages, Translations.lang). */
+var HELP_LANGS = ['fr', 'en'];
 
 // Sheet values → API codes: dubbel = word (both directions), enkel = oneway (nl → answer),
 // zin = sentence (cloze), vraag = question (fr prompt → nl). Old values woord/calc are still read.
@@ -24,7 +34,7 @@ var TRACKS = ['recog', 'prod'];
 var MODES = ['nl_fr', 'fr_nl', 'cloze', 'question', 'listen'];
 
 // Settings rows that setup removes from the sheet (features that no longer exist).
-var OBSOLETE_SETTINGS = ['cooldown_minutes', 'session_max_cards', 'session_max_minutes', 'session_extra_cards',
+var OBSOLETE_SETTINGS = ['require_approval', 'cooldown_minutes', 'session_max_cards', 'session_max_minutes', 'session_extra_cards',
   'session_resume_minutes', 'min_reviews_to_count', 'new_per_session', 'max_cards_per_round', 'compliments_enabled',
   'mature_stability_days', 'curriculum_only'];
 
@@ -34,13 +44,15 @@ var SETTINGS_DEFAULTS = [
   ['unlock_prod_stability_days', 3, 'Stabiliteit (dagen) van herkennen voordat de richting FR → NL start'],
   ['known_stability_days', 7, 'Een kaart is "bekend" vanaf deze stabiliteit in dagen (curriculum-regel bekend, Voortgang)'],
   ['known_min_reviews', 2, '… en na minstens zoveel herhalingen'],
-  ['show_french_help', true, 'Knop "Hulp" en Franse uitleg tonen (uitvinken als ze klaar is)'],
+  ['show_french_help', true, 'Knop "Hulp" en uitleg in de hulptaal tonen'],
   ['max_learning_backlog', 3, 'Een nieuwe kaart komt pas als minder dan dit aantal kaarten nog in de korte stappen zit'],
-  ['require_approval', false, 'Alleen kaarten met controle = goedgekeurd gaan naar de app (aan = de leerling ziet geen ongecontroleerde kaarten)'],
   ['listen_share', 0.3, 'Deel van de herkenningskaarten als luisterkaart (0 = uit; alleen met een Nederlandse stem op de telefoon)'],
   ['due_window_minutes', 5, 'Kaarten die binnen minder dan zoveel minuten terugkomen, tellen al mee (en komen terug in dezelfde ronde)'],
   ['max_reviews_per_day', 100, 'Maximaal aantal herhalingen per dag (stil; de rest schuift door naar morgen)']
 ];
+
+// ---- Reference lists from Fanki. NOT seeded any more (v2 sheets are migrated, not set up); kept because
+// scripts/openmoji.mjs (EMOJI_SEED_CARDS) and scripts/check-ui-vocab.mjs (APP_SEED_CARDS) read them as text. ----
 
 // tag | label_nl (shown to the learner) | label_fr (teacher) | description | subject_nl (label above the card)
 var TAGS_SEED = [

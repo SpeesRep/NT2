@@ -16,7 +16,7 @@ clasp() { "$root/scripts/clasp.sh" "$@" 2> >(grep -v "npm notice" >&2); }
 cfg() { node -p "(require('./deploy.config.json')['$env'] || {})['$1'] || ''"; }
 dep="$(cfg deploymentId)"
 [[ -n "$dep" ]] || { echo "No deploymentId for $env in deploy.config.json" >&2; exit 1; }
-if grep -Eq "LEARNER_TOKEN: '[^']+'" apps-script/Secrets.gs; then echo "apps-script/Secrets.gs is not blank — refusing" >&2; exit 1; fi
+if grep -Eq "TOKEN: '[^']+'" apps-script/Secrets.gs; then echo "apps-script/Secrets.gs is not blank — refusing" >&2; exit 1; fi
 script_id="$(node -p "require('./.clasp.$env.json').scriptId")"
 desc="$(git rev-parse --short HEAD 2>/dev/null || echo local) $(date -u +%Y-%m-%dT%H:%MZ)"
 

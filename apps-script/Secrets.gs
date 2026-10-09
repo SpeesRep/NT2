@@ -1,5 +1,3 @@
-// BLANK ON PURPOSE — this file is committed.
-// Real values are pushed only from a temporary copy outside the repo
-// (scripts/push-secrets.sh), copied into Script Properties by setup(),
-// and then overwritten on Apps Script by pushing this blank file again.
-var SECRETS = { ENV: '', LEARNER_TOKEN: '', ADMIN_TOKEN: '' };
+// BLANK ON PURPOSE — this file is committed. Script Properties (ENV, SHEET_ID, ADMIN_TOKEN, …) are set by the
+// temporary scripts/setup-properties.sh function, never from here.
+var SECRETS = { ENV: '' };

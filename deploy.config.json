@@ -1,10 +1,12 @@
 {
   "dev": {
     "deploymentId": "AKfycbwPUPMjUfjLM_wObkYqkAgJ1zJS-NzZxltHBEf1XCB42fiPU__QezFdpYirctTHR18V",
-    "teacherDeploymentId": "AKfycbybBfgBmsw4bZDmNXzRhVTVOjDIsfXee8eL7siXRZLF0wzs8-GtZ0no0TgqYdq8xrjZ"
+    "teacherDeploymentId": "AKfycbybBfgBmsw4bZDmNXzRhVTVOjDIsfXee8eL7siXRZLF0wzs8-GtZ0no0TgqYdq8xrjZ",
+    "teacherAccess": "MYSELF"
   },
   "prod": {
     "deploymentId": "AKfycbyGq2glsi3zBHFXKc9SZGNVCifyOr_GFobPn8V75YIIbj1a3Nq-93DJz4PaV2jZVIe3",
-    "teacherDeploymentId": "AKfycbzN_cxWA2TRr035BXrjQ6cE8p74vme4w6bm3jp9YcvjINNnd7OGGtw87lXpZ4ujGOQ"
+    "teacherDeploymentId": "AKfycbzN_cxWA2TRr035BXrjQ6cE8p74vme4w6bm3jp9YcvjINNnd7OGGtw87lXpZ4ujGOQ",
+    "teacherAccess": "MYSELF"
   }
 }
