@@ -5,8 +5,14 @@
 
 var GITHUB_REPO = 'SpeesRep/NT2';
 
+/** Owner page button (google.script.run). */
 function reviewPublish() {
   requireTeacher_();
+  return dispatchPublish_();
+}
+
+/** POSTs the repository_dispatch for this environment; returns {env, at}. Throws when GitHub refuses. */
+function dispatchPublish_() {
   var env = String(env_()).toLowerCase();
   if (env !== 'dev' && env !== 'prod') throw new Error('ENV ontbreekt in de Script Properties.');
   var token = props_().getProperty('GITHUB_DISPATCH_TOKEN');

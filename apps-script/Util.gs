@@ -106,10 +106,6 @@ function safeEquals_(a, b) {
   return diff === 0;
 }
 
-/** 'admin' | null. SpeesRep has no learner token: students never call the API. */
-function roleFor_(token) {
-  return safeEquals_(token, props_().getProperty('ADMIN_TOKEN')) ? 'admin' : null;
-}
 
 function withLock_(fn) {
   var lock = LockService.getScriptLock();

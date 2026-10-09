@@ -1,7 +1,7 @@
 name: Admin action
 
-# Runs ONE admin action of the Apps Script API with the ADMIN_TOKEN_<ENV> secret, so nobody needs the token
-# locally. Manual only (Actions → Admin action → Run workflow, or `gh workflow run admin.yml -f env=dev
+# Runs ONE admin action of the Apps Script API with the ADMIN_KEY_<ENV> secret (the owner's admin key; the server
+# keeps only its hash), so it also works without the key on this machine. Manual only (Actions → Admin action → Run workflow, or `gh workflow run admin.yml -f env=dev
 # -f action=migrateV2 -f payload='{"dryRun":true}'`). Writing actions are dry runs unless the payload says
 # "dryRun": false. The result (JSON, never the token) is printed and added to the run summary.
 on:
@@ -13,10 +13,9 @@ on:
         options: [dev, prod]
         default: dev
       action:
-        description: Admin action
-        type: choice
-        options: [migrateV2, groups, listCards, tags, readTab, deleteTabs, setSetting]
-        default: migrateV2
+        description: Admin action (e.g. admin.overview, admin.createGroup, readTab, migrateV2)
+        type: string
+        default: admin.overview
       payload:
         description: JSON payload (e.g. {"dryRun":false} or {"tab":"Groups"})
         default: '{}'
@@ -40,6 +39,8 @@ jobs:
         env:
           API_URL_DEV: ${{ secrets.API_URL_DEV }}
           API_URL_PROD: ${{ secrets.API_URL_PROD }}
+          ADMIN_KEY_DEV: ${{ secrets.ADMIN_KEY_DEV }}
+          ADMIN_KEY_PROD: ${{ secrets.ADMIN_KEY_PROD }}
           ADMIN_TOKEN_DEV: ${{ secrets.ADMIN_TOKEN_DEV }}
           ADMIN_TOKEN_PROD: ${{ secrets.ADMIN_TOKEN_PROD }}
           PAYLOAD: ${{ github.event.inputs.payload }}

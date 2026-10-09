@@ -1,7 +1,8 @@
 // Web app entry points. Every response is JSON with HTTP 200:
 //   { ok: true, ... }  or  { ok: false, error: '<code>', message: '...' }
-// Students never call this: the app reads content.json from its own site. Only the owner (admin token, via
-// scripts/admin.mjs or the Admin / Publish content workflows) and the owner-only HtmlService pages use it.
+// Students never call this: the app reads content.json from its own site. Callers: teachers (their invite key,
+// from /docent/ — TeacherApi.gs), the owner (admin key: scripts/admin.mjs, the Admin / Publish content workflows —
+// AdminApi.gs and the actions below) and the owner-only HtmlService pages (Google login). Keys: Auth.gs.
 
 function doGet(e) {
   var p = (e && e.parameter) || {};
@@ -28,9 +29,12 @@ function doPost(e) {
     } catch (err) {
       throw apiError_('bad_json', 'Body must be JSON (sent as text/plain).');
     }
-    if (roleFor_(body.token) !== 'admin') throw apiError_('unauthorized', 'Bad or missing token.');
+    var action = String(body.action || '');
+    var who = authenticate_(body.key !== undefined ? body.key : body.token);
+    if (who.role === 'teacher') return teacherAction_(who.teacher, action, body);
+    if (action.indexOf('admin.') === 0) return runAdmin_(action, body);
     var dryRun = body.dryRun !== false;
-    switch (body.action || '') {
+    switch (action) {
       case 'content': return getCards_(); // the word list for content.json (Publish content workflow)
       case 'migrateV2': return adminMigrateV2_(dryRun);
       case 'listCards': return adminListCards_();
@@ -40,8 +44,23 @@ function doPost(e) {
       case 'setSetting': return adminSetSetting_(body.key, body.value, dryRun);
       case 'groups': return { groups: readGroups_() };
     }
-    throw apiError_('unknown_action', 'Unknown POST action: ' + body.action);
+    throw apiError_('unknown_action', 'Unknown POST action: ' + action);
   });
+}
+
+/** The teacher actions (spec › API actions); `group` in the body is checked by each action (requireGroup_). */
+function teacherAction_(t, action, body) {
+  switch (action) {
+    case 'me': return teacherMe_(t);
+    case 'inbox': return teacherInbox_(t, body.group);
+    case 'reviewCards': return teacherReviewCards_(t, body.group, body.decisions);
+    case 'getCurriculum': return teacherGetCurriculum_(t, body.group);
+    case 'saveCurriculum': return teacherSaveCurriculum_(t, body.group, body.rows, body.version);
+    case 'propose': return teacherPropose_(t, body.group, body.proposal);
+    case 'joinInfo': return teacherJoinInfo_(t, body.group);
+    case 'publish': return teacherPublish_(t, body.group);
+  }
+  throw apiError_('forbidden', 'Not allowed: ' + action);
 }
 
 function handle_(fn) {

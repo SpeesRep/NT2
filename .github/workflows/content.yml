@@ -66,6 +66,8 @@ jobs:
         env:
           API_URL_DEV: ${{ secrets.API_URL_DEV }}
           API_URL_PROD: ${{ secrets.API_URL_PROD }}
+          ADMIN_KEY_DEV: ${{ secrets.ADMIN_KEY_DEV }}
+          ADMIN_KEY_PROD: ${{ secrets.ADMIN_KEY_PROD }}
           ADMIN_TOKEN_DEV: ${{ secrets.ADMIN_TOKEN_DEV }}
           ADMIN_TOKEN_PROD: ${{ secrets.ADMIN_TOKEN_PROD }}
         run: node main/scripts/build-content.mjs "${{ steps.env.outputs.env }}" "content/${{ steps.env.outputs.env }}/content.json" | tee -a "$GITHUB_STEP_SUMMARY" | grep -E '^changed=' >> "$GITHUB_OUTPUT"

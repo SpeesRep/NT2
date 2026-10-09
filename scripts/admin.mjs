@@ -19,17 +19,18 @@ export function loadEnv() {
       if (m) env[m[1]] = m[2].replace(/^"|"$/g, '');
     }
   }
-  for (const [k, v] of Object.entries(process.env)) if (/^(API_URL|ADMIN_TOKEN)_/.test(k) && v) env[k] = v;
+  for (const [k, v] of Object.entries(process.env)) if (/^(API_URL|ADMIN_KEY|ADMIN_TOKEN)_/.test(k) && v) env[k] = v;
   return env;
 }
 
-export async function call(envName, action, payload = {}, { role = 'admin' } = {}) {
+export async function call(envName, action, payload = {}) {
   const env = loadEnv();
   const E = envName.toUpperCase();
   const url = env[`API_URL_${E}`];
-  const token = env[`${role === 'admin' ? 'ADMIN' : 'LEARNER'}_TOKEN_${E}`];
-  if (!url || !token) throw new Error(`API_URL_${E} or token missing (.env.local or environment)`);
-  const body = JSON.stringify({ ...payload, action, token });
+  // The owner's admin key (ADMIN_KEY_<ENV>; the server keeps only its hash). ADMIN_TOKEN_<ENV> = the first setup's token.
+  const token = env[`ADMIN_KEY_${E}`] || env[`ADMIN_TOKEN_${E}`];
+  if (!url || !token) throw new Error(`API_URL_${E} or ADMIN_KEY_${E} missing (.env.local or environment)`);
+  const body = JSON.stringify({ ...payload, action, key: token });
   let lastErr;
   // Every action is idempotent, so a lost/garbled round-trip is simply retried.
   for (let attempt = 0; attempt < 5; attempt++) {
