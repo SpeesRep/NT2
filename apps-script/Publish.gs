@@ -1,5 +1,5 @@
-// "Publiceren" (teacher Start page): asks GitHub to publish THIS environment's word list as content.json
-// (.github/workflows/content.yml, repository_dispatch `publish`). The app only ever reads that file.
+// "Publiceren": asks GitHub to rebuild the site with every group's word list (.github/workflows/deploy.yml,
+// repository_dispatch `publish`; it exports DEV and PROD). The student app only ever reads those files.
 // Needs Script Property GITHUB_DISPATCH_TOKEN: a fine-grained GitHub token for SpeesRep/NT2 only, with
 // Repository permission "Contents: Read and write" (required by repository_dispatch). Never in the repo.
 
@@ -35,7 +35,7 @@ function dispatchPublish_() {
 function publishInfo_() {
   return {
     last: props_().getProperty('LAST_PUBLISH') || '',
-    runs: 'https://github.com/' + GITHUB_REPO + '/actions/workflows/content.yml',
+    runs: 'https://github.com/' + GITHUB_REPO + '/actions/workflows/deploy.yml',
     file: (APP_URLS[env_()] || '') + 'content.json'
   };
 }

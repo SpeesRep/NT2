@@ -1,6 +1,6 @@
 // Keys and permissions (spec › Teacher access). Teachers have no account: each gets a personal invite key
 // (…/docent/#key=…, 32 random characters). The server stores only SHA-256 hashes: Teachers.key_hash, and Script
-// Property ADMIN_KEY_HASH for the owner. Every request is checked here; a group code from the browser is never
+// Properties ADMIN_KEY_HASH (the owner) and EXPORT_KEY_HASH (the deploy workflow: action `export` only). Every request is checked here; a group code from the browser is never
 // trusted on its own (teacherGroup_).
 // The pure parts (hashing aside) are unit-tested in src/auth.test.ts.
 
@@ -98,6 +98,8 @@ function authenticate_(key) {
     var hash = sha256Hex_(key);
     var p = props_(), adminHash = p.getProperty('ADMIN_KEY_HASH');
     if (adminHash && safeEquals_(hash, adminHash)) return { role: 'admin' };
+    var exportHash = p.getProperty('EXPORT_KEY_HASH');
+    if (exportHash && safeEquals_(hash, exportHash)) return { role: 'export' }; // read-only: the deploy's export
     // Until the first admin.setAdminKeyHash, the plain ADMIN_TOKEN of the first setup still works (then it is deleted).
     if (!adminHash && safeEquals_(key, p.getProperty('ADMIN_TOKEN'))) return { role: 'admin' };
     var t = teacherForHash_(hash, readTeachers_(), readInstitutions_());

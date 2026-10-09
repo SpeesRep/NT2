@@ -21,13 +21,14 @@ Sheet, Log/Progress or "her" are inherited from Fanki and outdated where they co
   outbox event; the old `queue` store stays empty). No API client, no tokens in the app.
 - CSP meta tag (production builds, `CSP` in vite.config.ts): everything `'self'`, `connect-src 'self'`. No external
   origins, no analytics. e2e asserts only same-origin GETs and no CSP violations.
-- `.github/workflows/content.yml` (Actions → Publish content, or repository_dispatch `publish` with
-  client_payload.env): `scripts/build-content.mjs <env>` calls the admin action `content` (POST, ADMIN_TOKEN_<ENV>
-  secret) → validates (non-empty, env matches, card ids present/unique/never derived from the word: random
-  `c_xxxxxxxxxx` or hand-made codes like `K-01`) → `{format:1, version (sha256 of the content), env, generated_at,
-  cards, settings, tags, curriculum}` → commits `<env>/content.json` to the `content` branch only when the version
-  changed → calls deploy.yml (workflow_call), which copies it to `/NT2/content.json` (PROD) and
-  `/NT2/dev/content.json` (DEV). content.json is never precached by the service worker.
+- Publishing (spec phase 3, no commits): `.github/workflows/deploy.yml` (push to main/release, Run workflow, or
+  repository_dispatch `publish` from Publiceren) builds both apps, then `scripts/build-content.mjs <env> <siteDir>`
+  calls the API action `export` with the read-only `EXPORT_KEY_<ENV>` secret (Script Property EXPORT_KEY_HASH) and
+  writes `/NT2/g/<code>/content.json` (PROD) and `/NT2/dev/g/<code>/content.json` (DEV) for every group: the approved
+  cards the group accepted that belong to its curriculum (also dicht rows), translations in its languages, its
+  curriculum, tags, settings; `{format, code, active:false}` for an inactive group. Validation (ids stable/unique/not
+  word-derived, codes, env) stops the deploy, so the live files stay. `version` = sha256 of the content. TRANSITIONAL
+  until phase 4: the first active group's list is also written to `<siteDir>/content.json` for the current app.
 - "Publiceren" = a tile on the teacher Start page (apps-script/Publish.gs `reviewPublish`): POSTs the
   repository_dispatch with Script Property `GITHUB_DISPATCH_TOKEN` (fine-grained token, SpeesRep/NT2 only,
   Contents: Read and write). A sheet menu is impossible: the projects are standalone, not bound to the sheets.

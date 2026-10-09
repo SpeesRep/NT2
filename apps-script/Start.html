@@ -41,7 +41,7 @@
   tr('start.share.steps').forEach(function (s) { var li = document.createElement('li'); li.textContent = s; $('shareSteps').appendChild(li); });
   $('shareNote').textContent = tr('start.share.note', { env: CTX.env });
 
-  // Publiceren: GitHub builds content.json from this sheet (Publish.gs → content.yml).
+  // Publiceren: GitHub rebuilds the site with every group's word list (Publish.gs → deploy.yml).
   var pub = $('tPublish'), btn = $('publishBtn'), msg = $('publishMsg');
   pub.querySelector('h2').textContent = tr('start.publish.title');
   pub.querySelector('p').textContent = tr('start.publish.text', { env: CTX.env });

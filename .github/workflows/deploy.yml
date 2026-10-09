@@ -1,14 +1,16 @@
 name: Deploy to GitHub Pages
 
-# One Pages artifact, two apps + their word lists:
-#   release branch → PROD at /NT2/      (+ content branch prod/content.json → /NT2/content.json)
-#   main branch    → DEV  at /NT2/dev/  (+ content branch dev/content.json  → /NT2/dev/content.json)
-# Also called by content.yml after a new word list is published.
+# One Pages artifact, two apps + every group's word list (spec › Publishing; nothing is committed):
+#   release branch → PROD at /NT2/      + PROD groups at /NT2/g/<code>/content.json
+#   main branch    → DEV  at /NT2/dev/  + DEV groups  at /NT2/dev/g/<code>/content.json
+# The word lists come from the Apps Script export (read-only EXPORT_KEY_<ENV> secret) at every deploy.
+# Publiceren (teacher page / owner page) = repository_dispatch `publish`; also by hand (Run workflow).
 on:
   push:
     branches: [main, release]
   workflow_dispatch:
-  workflow_call:
+  repository_dispatch:
+    types: [publish]
 
 permissions:
   contents: read
@@ -44,22 +46,6 @@ jobs:
         with:
           ref: release
           path: release
-
-      - name: Does the content branch exist?
-        id: content
-        run: |
-          if git ls-remote --exit-code --heads "https://github.com/${{ github.repository }}" content >/dev/null; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Checkout content (published word lists)
-        if: steps.content.outputs.exists == 'true'
-        uses: actions/checkout@v7
-        with:
-          ref: content
-          path: content
 
       - uses: actions/setup-node@v7
         with:
@@ -109,11 +95,19 @@ jobs:
           fi
           rm -rf site/dev
           cp -R main/dist/dev site/dev
-          # Word lists (never precached by the service worker: the app checks them itself).
-          if [ -f content/prod/content.json ]; then cp content/prod/content.json site/content.json; fi
-          if [ -f content/dev/content.json ]; then cp content/dev/content.json site/dev/content.json; fi
           touch site/.nojekyll
           find site -maxdepth 2 | sort
+
+      - name: Word lists (every group, from the export; never precached by the service worker)
+        env:
+          API_URL_DEV: ${{ secrets.API_URL_DEV }}
+          API_URL_PROD: ${{ secrets.API_URL_PROD }}
+          EXPORT_KEY_DEV: ${{ secrets.EXPORT_KEY_DEV }}
+          EXPORT_KEY_PROD: ${{ secrets.EXPORT_KEY_PROD }}
+        run: |
+          node main/scripts/build-content.mjs prod site | tee -a "$GITHUB_STEP_SUMMARY"
+          node main/scripts/build-content.mjs dev site/dev | tee -a "$GITHUB_STEP_SUMMARY"
+          find site -name content.json | sort
 
       - uses: actions/upload-pages-artifact@v5
         with:

@@ -176,6 +176,14 @@ var ADMIN_ACTIONS = {
     plan.dryRun = false;
     return plan;
   },
+  /** Sets the deploy's read-only export key (only its SHA-256 is stored). */
+  'admin.setExportKeyHash': function (b) {
+    var h = String(b.hash || '').toLowerCase();
+    if (!/^[0-9a-f]{64}$/.test(h)) throw apiError_('bad_request', 'hash must be 64 hex characters (SHA-256)');
+    props_().setProperty('EXPORT_KEY_HASH', h);
+    audit_('owner', 'setExportKeyHash', '');
+    return { ok: true };
+  },
   /** Sets the owner's key: stores only its SHA-256 and deletes the plain ADMIN_TOKEN of the first setup. */
   'admin.setAdminKeyHash': function (b) {
     var h = String(b.hash || '').toLowerCase();

@@ -32,10 +32,14 @@ function doPost(e) {
     var action = String(body.action || '');
     var who = authenticate_(body.key !== undefined ? body.key : body.token);
     if (who.role === 'teacher') return teacherAction_(who.teacher, action, body);
+    if (who.role === 'export') {
+      if (action !== 'export') throw apiError_('forbidden', 'The export key can only export.');
+      return exportGroups_();
+    }
     if (action.indexOf('admin.') === 0) return runAdmin_(action, body);
     var dryRun = body.dryRun !== false;
     switch (action) {
-      case 'content': return getCards_(); // the word list for content.json (Publish content workflow)
+      case 'export': return exportGroups_(); // the owner may run it too (scripts/build-content.mjs locally)
       case 'migrateV2': return adminMigrateV2_(dryRun);
       case 'listCards': return adminListCards_();
       case 'tags': return adminTags_(body.add);
@@ -86,43 +90,6 @@ function cardToJson_(r, tr) {
     pos: String(r.pos || ''), example_nl: text_(r.example_nl), answer: text_(r.answer), tags: splitTags_(r.tags),
     flags: splitTags_(r.flags), added: isoDate_(r.added), active: bool_(r.active), status: cardStatus_(r.status),
     fr: tr.fr ? tr.fr.text : '', example_fr: tr.fr ? tr.fr.example : '', translations: translations
-  };
-}
-
-/**
- * The word list of ONE group (default: the first active group) for content.json: approved cards that the group
- * accepted, with translations in the group's languages; its curriculum rows; tags; settings.
- */
-function getCards_(groupCode) {
-  var group = groupCode ? readGroups_().filter(function (g) { return g.group_code === groupCode; })[0] : defaultGroup_();
-  if (!group) throw apiError_('no_group', 'Unknown group ' + groupCode);
-  var cardsSh = sheet_('Cards');
-  var t = readTable_(cardsSh);
-  if (t.rows.some(function (r) { return String(r.nl).trim() && String(r.id).trim() === ''; })) {
-    withLock_(function () { fillIds_(cardsSh); });
-    t = readTable_(cardsSh);
-  }
-  var accepted = readGroupCards_()[group.group_code] || {};
-  var tr = readTranslations_();
-  var cards = t.rows.filter(function (r) { return cardServed_(r) && accepted[String(r.id)] === 'accepted'; })
-    .map(function (r) {
-      var mine = {};
-      var all = tr[String(r.id)] || {};
-      group.languages.forEach(function (l) { if (all[l]) mine[l] = all[l]; });
-      return cardToJson_(r, mine);
-    });
-  var tags = readTable_(sheet_('Tags')).rows.map(function (r) {
-    return { tag: String(r.tag).trim().toLowerCase(), label_nl: String(r.label_nl || r.tag || ''), label_fr: String(r.label_fr || ''),
-      subject_nl: String(r.subject_nl || '').trim() };
-  }).filter(function (x) { return x.tag; });
-  return {
-    env: env_(),
-    serverTime: new Date().toISOString(),
-    group: { code: group.group_code, display_name: group.display_name, languages: group.languages },
-    cards: cards,
-    settings: readSettings_(),
-    tags: tags,
-    curriculum: readCurriculum_(group.group_code)
   };
 }
 
