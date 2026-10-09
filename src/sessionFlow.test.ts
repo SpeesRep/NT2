@@ -10,7 +10,7 @@ const MIN = 60_000;
 const rules = { max_learning_backlog: 3, due_window_minutes: 10 };
 const settings = { ...rules, new_per_day: 0, unlock_prod_stability_days: 3, max_reviews_per_day: 100 };
 const card = (id: string): Card =>
-  ({ id, type: 'word', nl: id, article: '', pos: '', fr: id, example_nl: '', example_fr: '', tags: [], flags: [], answer: '', added: '2026-10-01', active: true }) as Card;
+  ({ id, type: 'word', nl: id, article: '', pos: '', help: id, example_nl: '', help_example: '', tags: [], flags: [], answer: '', added: '2026-10-01', active: true }) as Card;
 const newItem = (id: string): Item => ({ card: card(id), track: 'recog', isNew: true });
 const prog = (id: string, dueAt: number): Progress => ({
   key: progressKey(id, 'recog'), card_id: id, track: 'recog', state: 'Learning', due: new Date(dueAt).toISOString(), stability: 1,

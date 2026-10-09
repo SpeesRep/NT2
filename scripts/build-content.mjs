@@ -2,12 +2,14 @@
 // Writes every group's word list into the site being deployed (spec › Publishing). Nothing is committed.
 // Usage: node scripts/build-content.mjs <dev|prod> <siteDir>
 //   Calls the API action `export` with EXPORT_KEY_<ENV> (read-only; GitHub secret) and API_URL_<ENV>.
-//   Writes <siteDir>/g/<code>/content.json per group (inactive group: {format, code, active:false}).
+//   Writes <siteDir>/g/<code>/content.json per group (inactive group: {format, code, active:false}), and for an
+//   active group its install page <siteDir>/g/<code>/index.html + manifest.webmanifest (groupPage): the app itself,
+//   with a manifest whose start_url carries the code, so "Zet op beginscherm" on an iPhone keeps the group.
 //   Refuses to publish when the export looks wrong (bad ids, bad codes, an active group's env mismatch) — the
 //   deploy then fails and the live site keeps the previous files.
 // The files are the student app's ONLY data source: fetched from its own origin, nothing is sent back.
 import { createHash } from 'node:crypto';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { call } from './admin.mjs';
@@ -72,6 +74,21 @@ export function lostIds(previous, next) {
   return previous.cards.filter((c) => !now.has(c.id)).map((c) => `${c.id} (${c.nl})`);
 }
 
+/**
+ * A group's install page from the built app (pure): index.html with its manifest link pointing at the group's own
+ * manifest, and that manifest = the app's with start_url/id `<base>?groep=<code>` and absolute icon paths.
+ * Returns null when the site has no built app yet (e.g. the PROD placeholder before the first release).
+ */
+export function groupPage(indexHtml, manifestJson, base, code) {
+  if (!/rel="manifest"/.test(indexHtml) || !manifestJson) return null;
+  const m = JSON.parse(manifestJson);
+  const start = `${base}?groep=${code}`;
+  const abs = (src) => (/^(https?:)?\//.test(src) ? src : base + src);
+  const manifest = { ...m, id: start, start_url: start, scope: base, icons: (m.icons ?? []).map((i) => ({ ...i, src: abs(i.src) })) };
+  const html = indexHtml.replace(/<link rel="manifest" href="[^"]*">/, '<link rel="manifest" href="manifest.webmanifest">');
+  return { html, manifest: JSON.stringify(manifest) };
+}
+
 /** The live file of a group (for the lost-ids warning), or null. */
 async function liveFile(env, code) {
   const base = env === 'prod' ? 'https://speesrep.github.io/NT2/' : 'https://speesrep.github.io/NT2/dev/';
@@ -96,18 +113,22 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     console.error(problems.join('\n'));
     throw new Error(`${problems.length} problem(s) in the ${env} export — nothing published`);
   }
+  const base = env === 'prod' ? '/NT2/' : '/NT2/dev/';
+  const indexHtml = existsSync(join(site, 'index.html')) ? readFileSync(join(site, 'index.html'), 'utf8') : '';
+  const manifestJson = existsSync(join(site, 'manifest.webmanifest')) ? readFileSync(join(site, 'manifest.webmanifest'), 'utf8') : '';
   for (const g of res.groups) {
     const content = toContent(env, g);
     const dir = join(site, 'g', g.code);
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, 'content.json'), JSON.stringify(content) + '\n');
+    const page = content.active ? groupPage(indexHtml, manifestJson, base, g.code) : null;
+    if (page) {
+      writeFileSync(join(dir, 'index.html'), page.html);
+      writeFileSync(join(dir, 'manifest.webmanifest'), page.manifest);
+    }
     const lost = content.active ? lostIds(await liveFile(env, g.code), content) : [];
     if (lost.length) console.log(`::warning::${env} ${g.code}: ${lost.length} card(s) no longer published: ${lost.slice(0, 20).join(', ')}`);
     if (content.active && !content.cards.length) console.log(`::warning::${env} ${g.code}: no cards yet`);
     console.log(`${env} ${g.code}: ${content.active ? `${content.cards.length} cards, version ${content.version}` : 'inactive'}`);
   }
-  // TRANSITIONAL until the app knows group codes (spec phase 4, which removes this): the first active group's list
-  // also at <site>/content.json, where the current app looks for it.
-  const first = res.groups.find((g) => g.active);
-  if (first) writeFileSync(join(site, 'content.json'), JSON.stringify(toContent(env, first)) + '\n');
 }

@@ -6,16 +6,19 @@ import { t } from '../i18n';
 import { answerIsDutch, dutchSpeech, speakDutch } from '../tts';
 import { SpeakButton } from './SpeakButton';
 import { openmojiFor } from '../openmoji';
+import { useStore } from '../store';
 
 /**
- * One card in a given direction.
- *   nl_fr     front: Dutch (with de/het)      back: French
- *   fr_nl     front: French                   back: Dutch (with de/het)
- *   cloze     front: sentence with a blank + French translation    back: the missing word filled in
- *   question  front: French prompt            back: expected Dutch answer
+ * One card in a given direction ("fr" in the mode names = the student's HELP language, card.help; '' when none):
+ *   nl_fr     front: Dutch (with de/het)      back: help text
+ *   fr_nl     front: help text                back: Dutch (with de/het)
+ *   cloze     front: sentence with a blank + help text    back: the missing word filled in
+ *   question  front: help-language prompt     back: expected Dutch answer (cards without one are left out)
  *   oneway    front: nl (Dutch prompt)        back: answer
+ * Every text element has lang + dir="auto", so right-to-left help languages work.
  */
 export function CardFace({ card, mode, revealed, readAnswer = false }: { card: Card; mode: Mode; revealed: boolean; readAnswer?: boolean }) {
+  const hl = useStore().helpLang || undefined; // the help language's code for lang=""
   const shown = visibleFlags(card);
   const flags =
     shown.length > 0 ? (
@@ -37,10 +40,10 @@ export function CardFace({ card, mode, revealed, readAnswer = false }: { card: C
 
   const example = card.example_nl ? (
     <p class="card-example">
-      <span lang="nl">{card.example_nl}</span>
-      {card.example_fr && (
-        <span class="card-example-fr" lang="fr">
-          {card.example_fr}
+      <span lang="nl" dir="auto">{card.example_nl}</span>
+      {card.help_example && (
+        <span class="card-example-fr" lang={hl} dir="auto">
+          {card.help_example}
         </span>
       )}
     </p>
@@ -56,7 +59,7 @@ export function CardFace({ card, mode, revealed, readAnswer = false }: { card: C
     if (revealed && readAnswer && answerIsDutch(mode)) speakDutch(speech);
   }, [card.id, mode, revealed]);
 
-  // Listening card: only the sound first; the reveal shows the Dutch word and the French.
+  // Listening card: only the sound first; the reveal shows the Dutch word and the help text.
   if (mode === 'listen') {
     return (
       <article class="card" aria-live="polite">
@@ -68,13 +71,15 @@ export function CardFace({ card, mode, revealed, readAnswer = false }: { card: C
         ) : (
           <>
             {flags}
-            <p class="card-front" lang="nl">
+            <p class="card-front" lang="nl" dir="auto">
               {dutchWord} <SpeakButton text={speech} />
             </p>
             <div class="card-back">
-              <p class="card-answer" lang="fr">
-                {card.fr}
-              </p>
+              {card.help && (
+                <p class="card-answer" lang={hl} dir="auto">
+                  {card.help}
+                </p>
+              )}
               {example}
             </div>
           </>
@@ -101,18 +106,18 @@ export function CardFace({ card, mode, revealed, readAnswer = false }: { card: C
             ?
           </div>
         ) : (
-          <p class="card-prompt card-prompt-big" lang="nl">
+          <p class="card-prompt card-prompt-big" lang="nl" dir="auto">
             {card.nl}
           </p>
         )}
-        {card.fr && (
-          <p class="card-prompt" lang="fr">
-            {card.fr}
+        {card.help && (
+          <p class="card-prompt" lang={hl} dir="auto">
+            {card.help}
           </p>
         )}
         {revealed && (
           <div class="card-back">
-            <p class="card-answer" lang="nl">
+            <p class="card-answer" lang="nl" dir="auto">
               {card.answer} {speech && <SpeakButton text={speech} />}
             </p>
             {example}
@@ -127,14 +132,16 @@ export function CardFace({ card, mode, revealed, readAnswer = false }: { card: C
     return (
       <article class="card" aria-live="polite">
         {flags}
-        <p class="card-sentence" lang="nl">
+        <p class="card-sentence" lang="nl" dir="auto">
           {c.before}
           {revealed ? <mark class="cloze-answer">{c.answer}</mark> : <span class="cloze-blank">＿＿＿</span>}
           {c.after}
         </p>
-        <p class="card-prompt" lang="fr">
-          {card.fr}
-        </p>
+        {card.help && (
+          <p class="card-prompt" lang={hl} dir="auto">
+            {card.help}
+          </p>
+        )}
       </article>
     );
   }
@@ -144,22 +151,24 @@ export function CardFace({ card, mode, revealed, readAnswer = false }: { card: C
     <article class="card" aria-live="polite">
       {flags}
       {nlFront ? (
-        <p class="card-front" lang="nl">
+        <p class="card-front" lang="nl" dir="auto">
           {dutchWord} <SpeakButton text={speech} />
         </p>
       ) : (
-        <p class={mode === 'question' ? 'card-prompt card-prompt-big' : 'card-front'} lang="fr">
-          {card.fr}
+        <p class={mode === 'question' ? 'card-prompt card-prompt-big' : 'card-front'} lang={hl} dir="auto">
+          {card.help}
         </p>
       )}
       {revealed && (
         <div class="card-back">
           {nlFront ? (
-            <p class="card-answer" lang="fr">
-              {card.fr}
-            </p>
+            card.help && (
+              <p class="card-answer" lang={hl} dir="auto">
+                {card.help}
+              </p>
+            )
           ) : (
-            <p class="card-answer" lang="nl">
+            <p class="card-answer" lang="nl" dir="auto">
               {dutchWord} <SpeakButton text={speech} />
             </p>
           )}

@@ -1090,3 +1090,14 @@ label.btn.disabled {
   margin: 0;
   font-size: 15px;
 }
+
+/* Group code + help language (src/screens/JoinScreen.tsx, LanguageScreen.tsx) */
+.join form { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.join-label { font-weight: 600; }
+.join-input { font: inherit; font-size: 28px; letter-spacing: 0.15em; text-align: center; padding: 14px; border-radius: 12px;
+  border: 2px solid var(--line, #3a4048); background: var(--card, #1a1f25); color: inherit; text-transform: lowercase; }
+.join-error { color: var(--bad, #e5484d); font-weight: 600; margin: 0; }
+.lang-list { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.lang-choice { font-size: 20px; min-height: 56px; }
+.banner-group { background: var(--warn-bg, #3b2f12); }
+.chip-help { display: block; font-size: 13px; opacity: 0.75; }

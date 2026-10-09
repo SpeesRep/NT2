@@ -8,7 +8,7 @@ function adminListCards_() {
     .map(function (r) { return cardToJson_(r, tr[String(r.id)]); }) };
 }
 
-/** Lists tags; optionally appends new ones: add = [{tag, label_nl, label_fr, description}]. */
+/** Lists tags (+ their names per language); optionally appends new ones: add = [{tag, label_nl, description}]. */
 function adminTags_(add) {
   var sh = sheet_('Tags');
   var added = [];
@@ -18,15 +18,18 @@ function adminTags_(add) {
       add.forEach(function (t) {
         var tag = String(t && t.tag || '').trim().toLowerCase();
         if (!/^[a-z0-9-]{2,30}$/.test(tag) || existing.indexOf(tag) !== -1) return;
-        var row = { tag: tag, label_nl: String(t.label_nl || tag), label_fr: String(t.label_fr || ''), description: String(t.description || '') };
+        var row = { tag: tag, label_nl: String(t.label_nl || tag), description: String(t.description || '') };
         sh.getRange(nextRow_(sh, 1), 1, 1, SCHEMA.Tags.length).setValues([rowFromObject_(SCHEMA.Tags, row)]);
         existing.push(tag);
         added.push(tag);
       });
     });
   }
+  var tt = readTagTranslations_();
   var tags = readTable_(sh).rows.map(function (r) {
-    return { tag: String(r.tag).trim().toLowerCase(), label_nl: String(r.label_nl || ''), label_fr: String(r.label_fr || ''), description: String(r.description || '') };
+    var tag = String(r.tag).trim().toLowerCase(), labels = {};
+    Object.keys(tt[tag] || {}).forEach(function (l) { labels[l] = tt[tag][l].label; });
+    return { tag: tag, label_nl: String(r.label_nl || ''), labels: labels, description: String(r.description || '') };
   }).filter(function (x) { return x.tag; });
   return { tags: tags, added: added };
 }

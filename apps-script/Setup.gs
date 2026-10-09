@@ -47,6 +47,11 @@ function applyV2Formats_(ss) {
     col_(sh, 'updated').setNumberFormat('yyyy-mm-dd hh:mm');
     text(sh, ['text', 'example']);
   });
+  with_('TagTranslations', function (sh) {
+    col_(sh, 'lang').setDataValidation(list_(HELP_LANGS, 'Hulptaal (fr, en …)'));
+    col_(sh, 'status').setDataValidation(list_(TRANSLATION_STATUS, 'machine = niet nagekeken · reviewed = nagekeken'));
+    col_(sh, 'updated').setNumberFormat('yyyy-mm-dd hh:mm');
+  });
   with_('GroupCards', function (sh) {
     col_(sh, 'status').setDataValidation(list_(GROUP_CARD_STATUS, 'inbox = wacht op de docent · accepted = leerlingen krijgen hem · hidden = verborgen'));
     col_(sh, 'updated').setNumberFormat('yyyy-mm-dd hh:mm');

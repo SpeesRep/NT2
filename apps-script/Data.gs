@@ -116,3 +116,27 @@ function readGroupCards_() {
   });
   return out;
 }
+
+// ---------- TagTranslations ----------
+
+/** tag → lang → {label, status, _row}. */
+function readTagTranslations_() {
+  var sh = tabOrNull_('TagTranslations'), out = {};
+  if (!sh) return out;
+  readTable_(sh).rows.forEach(function (r) {
+    var tag = String(r.tag).trim().toLowerCase(), lang = String(r.lang).trim().toLowerCase();
+    if (tag && lang && String(r.label).trim()) (out[tag] = out[tag] || {})[lang] = { label: String(r.label).trim(), status: String(r.status || 'machine'), _row: r._row };
+  });
+  return out;
+}
+
+/** Upserts one topic name (caller holds the lock); a machine row never replaces a reviewed one. */
+function setTagTranslation_(tag, lang, label, status, existing) {
+  var sh = sheet_('TagTranslations');
+  var cur = ((existing || readTagTranslations_())[tag] || {})[lang];
+  if (cur && cur.status === 'reviewed' && (status || 'machine') === 'machine') return 'kept';
+  var values = [rowFromObject_(SCHEMA.TagTranslations, { tag: tag, lang: lang, label: String(label).trim(), status: status || 'machine', updated: new Date() })];
+  if (cur) sh.getRange(cur._row, 1, 1, SCHEMA.TagTranslations.length).setValues(values);
+  else sh.getRange(nextRow_(sh, 1), 1, 1, SCHEMA.TagTranslations.length).setValues(values);
+  return cur ? 'update' : 'add';
+}

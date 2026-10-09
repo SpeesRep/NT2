@@ -8,7 +8,7 @@ const now = new Date('2026-10-20T12:00:00Z');
 const today = '2026-10-20';
 const known = { known_stability_days: 7, known_min_reviews: 2 };
 const card = (id: string, tags: string[], type: Card['type'] = 'question', added = '2026-09-29'): Card =>
-  ({ id, type, nl: id, article: '', pos: '', fr: id, example_nl: '', example_fr: '', tags, flags: [], answer: '', added, active: true }) as Card;
+  ({ id, type, nl: id, article: '', pos: '', help: id, example_nl: '', help_example: '', tags, flags: [], answer: '', added, active: true }) as Card;
 const row = (order: number, tag: string, rule: string, over: Partial<CurriculumRow> = {}): CurriculumRow => ({
   order, tag, rule, date: '', percentage: null, from_tags: [], ...over
 });

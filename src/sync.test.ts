@@ -1,14 +1,17 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { CONTENT_URL, cleanCard, cleanSettings, parseContent } from './sync';
+import { cleanCard, cleanSettings, cleanTranslations, parseContent } from './sync';
+import { codeFromUrl, contentUrl, isCode, normalizeCode } from './group';
+import { helpText, withHelpLang } from './helpLang';
 import { _resetDb, allCards, getSettings, saveSnapshot } from './db';
 import { byAdded } from './store';
 import { dutchText, subjectFor, visibleFlags } from './display';
 import type { Card } from './types';
 
 const raw = (over: Partial<Card> = {}): Partial<Card> => ({
-  id: 'c_1', type: 'word', nl: 'huis', article: 'het', pos: 'noun', fr: 'la maison',
-  example_nl: '', example_fr: '', tags: ['household'], flags: [], added: '2026-09-28', active: true,
+  id: 'c_1', type: 'word', nl: 'huis', article: 'het', pos: 'noun', help: '', help_example: '',
+  translations: { fr: { text: 'la maison', example: '' }, en: { text: 'the house', example: '' } },
+  example_nl: '', tags: ['household'], flags: [], added: '2026-09-28', active: true,
   ...over
 });
 
@@ -94,30 +97,72 @@ describe('badges shown to the learner', () => {
   });
 });
 
-describe('parseContent (content.json)', () => {
+describe('parseContent (a group\'s content.json)', () => {
   const file = (over: Record<string, unknown> = {}) => ({
-    format: 1, version: 'abc123', env: 'DEV', generated_at: '2026-10-06T20:00:00Z',
-    cards: [raw(), raw({ id: 'c_2', nl: 'tafel', active: false })], settings: { new_per_day: 7 }, tags: [{ tag: 'household', label_nl: 'huis' }],
+    format: 1, code: 'abcdefgh', active: true, version: 'abc123', env: 'DEV', display_name: 'Groep Zon', languages: ['fr', 'en'],
+    cards: [raw(), raw({ id: 'c_2', nl: 'tafel', active: false })], settings: { new_per_day: 7 },
+    tags: [{ tag: 'household', label_nl: 'huis', labels: { fr: 'la maison', en: 'home' } }],
     curriculum: [{ order: 1, tag: 'household', rule: 'always' }],
     ...over
   });
-  it('keeps the version and the active, cleaned cards', () => {
-    const c = parseContent(file());
+  it('keeps the version, the group, the active cards with all translations', () => {
+    const c = parseContent(file(), 'abcdefgh');
     expect(c.version).toBe('abc123');
+    expect(c.group).toEqual({ code: 'abcdefgh', display_name: 'Groep Zon', languages: ['fr', 'en'] });
     expect(c.cards.map((x) => x.id)).toEqual(['c_1']);
+    expect(c.cards[0].translations).toEqual({ fr: { text: 'la maison', example: '' }, en: { text: 'the house', example: '' } });
+    expect(c.tags[0].labels).toEqual({ fr: 'la maison', en: 'home' });
     expect(c.settings.new_per_day).toBe(7);
-    expect(c.curriculum[0]).toMatchObject({ tag: 'household', rule: 'always' });
   });
-  it('refuses a file without a version or without cards', () => {
-    expect(() => parseContent(file({ version: '' }))).toThrow();
-    expect(() => parseContent(file({ cards: undefined }))).toThrow();
-    expect(() => parseContent(null)).toThrow();
-    expect(() => parseContent('<html>')).toThrow();
+  it('refuses another group\'s file, an inactive stub, and anything that is not a word list', () => {
+    expect(() => parseContent(file(), 'zzzzzzzz')).toThrow();
+    expect(() => parseContent({ format: 1, code: 'abcdefgh', active: false }, 'abcdefgh')).toThrow();
+    expect(() => parseContent(file({ version: '' }), 'abcdefgh')).toThrow();
+    expect(() => parseContent(file({ cards: undefined }), 'abcdefgh')).toThrow();
+    expect(() => parseContent(null, 'abcdefgh')).toThrow();
+  });
+  it('cleans translations (bad language keys and empty texts go)', () => {
+    expect(cleanTranslations({ fr: { text: ' a ', example: '' }, 'x y': { text: 'b' }, en: { text: '', example: '' } })).toEqual({ fr: { text: 'a', example: '' } });
   });
 });
 
-describe('CONTENT_URL', () => {
-  it('is relative to the app (same origin, no API host)', () => {
-    expect(CONTENT_URL).toBe('/content.json');
+describe('group code', () => {
+  const base = '/NT2/dev/';
+  it('normalises what a student types', () => {
+    expect(normalizeCode(' AB3K 9MZQ ')).toBe('ab3k9mzq');
+    expect(normalizeCode('ab3k-9mzq')).toBe('ab3k9mzq');
+    expect(isCode('ab3k9mzq')).toBe(true);
+    expect(isCode('ab3k9mz0')).toBe(false); // 0 is not in the alphabet
+    expect(isCode('ab3k9mz')).toBe(false);
+  });
+  it('reads a code from a join link or a group page, nothing else', () => {
+    expect(codeFromUrl('https://x.io/NT2/dev/?groep=AB3K9MZQ', base)).toBe('ab3k9mzq');
+    expect(codeFromUrl('https://x.io/NT2/dev/g/ab3k9mzq/', base)).toBe('ab3k9mzq');
+    expect(codeFromUrl('https://x.io/NT2/dev/', base)).toBeNull();
+    expect(codeFromUrl('https://x.io/NT2/dev/?groep=nope', base)).toBeNull();
+  });
+  it('fetches only from the app\'s own site', () => {
+    expect(contentUrl('ab3k9mzq', base)).toBe('/NT2/dev/g/ab3k9mzq/content.json');
+  });
+});
+
+describe('help language', () => {
+  const q = { ...raw({ id: 'q1', type: 'question', translations: { fr: { text: 'Quelle heure ?', example: '' } } }), help: '', help_example: '' } as Card;
+  const w = { ...raw(), help: '', help_example: '' } as Card;
+  it('maps the chosen language onto the card', () => {
+    expect(withHelpLang([w], 'en')[0].help).toBe('the house');
+    expect(withHelpLang([w], 'fr')[0].help).toBe('la maison');
+    expect(withHelpLang([w], '')[0].help).toBe('');
+  });
+  it('leaves out a question card without a prompt in that language', () => {
+    expect(withHelpLang([q, w], 'fr').map((c) => c.id)).toEqual(['q1', 'c_1']);
+    expect(withHelpLang([q, w], 'en').map((c) => c.id)).toEqual(['c_1']);
+    expect(withHelpLang([q, w], '').map((c) => c.id)).toEqual(['c_1']);
+  });
+  it('help panels exist in fr and en, none without a language', () => {
+    expect(helpText('home', 'fr')).toMatch(/menu/);
+    expect(helpText('home', 'en')).toMatch(/menu/);
+    expect(helpText('home', '')).toBe('');
+    expect(helpText('home', 'ti')).toBe('');
   });
 });

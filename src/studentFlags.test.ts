@@ -5,7 +5,7 @@ import { createFlag, exportText, flagCardLabel, groupFlags, listFlags, openFlagC
 import type { Card } from './types';
 
 const card = (id: string, over: Partial<Card> = {}): Card => ({
-  id, type: 'word', nl: 'huis', article: 'het', pos: '', fr: 'la maison', example_nl: '', example_fr: '', tags: [],
+  id, type: 'word', nl: 'huis', article: 'het', pos: '', help: 'la maison', example_nl: '', help_example: '', tags: [],
   flags: [], answer: '', added: '2026-09-30', active: true, ...over
 });
 const at = (h: number) => new Date(Date.UTC(2026, 8, 30, h));
@@ -60,7 +60,7 @@ describe('student flags (🚩, local only)', () => {
 describe('export text for "Delen"', () => {
   const cards = new Map([
     ['c_1', card('c_1')],
-    ['K2-06', card('K2-06', { type: 'oneway', nl: '9:40u + 20 min = ...', article: '', fr: '', answer: '10:00u' })]
+    ['K2-06', card('K2-06', { type: 'oneway', nl: '9:40u + 20 min = ...', article: '', help: '', answer: '10:00u' })]
   ]);
 
   it('title, then one line per OPEN flag, newest first: word · note (no date)', () => {
@@ -79,7 +79,7 @@ describe('export text for "Delen"', () => {
   });
 
   it('a card that left the phone keeps its name: saved when flagged, and on every card refresh', async () => {
-    await saveSnapshot([card('c_1'), card('c_2', { nl: 'boom', article: 'de', fr: "l'arbre" })], {});
+    await saveSnapshot([card('c_1'), card('c_2', { nl: 'boom', article: 'de', help: "l'arbre" })], {});
     await createFlag('c_1', '', at(10)); // label saved now
     await (await import('./db')).db().then((d) => d.put('flags', { id: 'old', card_id: 'c_2', ts: at(9).toISOString(), note: '', resolved: false, updated_ts: '' }));
     await saveSnapshot([], {}); // both cards gone (e.g. not approved): the old flag gets its name first

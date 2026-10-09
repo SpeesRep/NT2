@@ -22,8 +22,39 @@ import { listenMode, voicesReady } from './tts';
 import { useSettings } from './settings';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { AboutScreen } from './screens/AboutScreen';
+import { JoinScreen } from './screens/JoinScreen';
+import { LanguageScreen } from './screens/LanguageScreen';
+import { GroupBanner } from './components/Banners';
+import { codeFromUrl } from './group';
+import { fetchGroup, joinGroup } from './sync';
+import type { UIKey } from './i18n';
 
-type Screen = { name: 'home' } | { name: 'topics' } | { name: 'marked' } | { name: 'progress' } | { name: 'settings' } | { name: 'about' } | { name: 'review'; items: Item[] };
+type Screen = { name: 'home' } | { name: 'topics' } | { name: 'marked' } | { name: 'progress' } | { name: 'settings' } | { name: 'about' } | { name: 'join' } | { name: 'review'; items: Item[] };
+
+/**
+ * A join link (…/?groep=<code>) or a group page (…/g/<code>/): join that group, then clean the address bar.
+ * Returns a message for the code screen when the code does not work (offline: kept, checked at the next update).
+ */
+async function joinFromLink(): Promise<{ code: string; message: UIKey } | null> {
+  const base = import.meta.env.BASE_URL;
+  const code = codeFromUrl(location.href, base);
+  if (!code) return null;
+  // A join link: clean the address bar. A group page (/g/<code>/) stays as it is: its manifest carries the code
+  // for "Zet op beginscherm".
+  if (!location.pathname.includes('/g/')) history.replaceState(null, '', base);
+  if (code === getState().groupCode) return null;
+  const res = await fetchGroup(code).catch(() => ({ status: 'unknown' as const }));
+  if (res.status === 'ok') {
+    await joinGroup(code, res.content);
+    return null;
+  }
+  if (res.status === 'offline') {
+    await setMeta('groupCode', code);
+    await loadFromDb();
+    return null;
+  }
+  return { code, message: res.status === 'stopped' ? 'join.stopped' : 'join.unknown' };
+}
 
 export function App() {
   const online = useOnline();
@@ -37,10 +68,16 @@ export function App() {
   const todayItems = () =>
     interleave(plan).map((i) => ({ ...i, listen: listenMode(i.card, i.track, i.progress?.reps ?? 0, settings) }));
 
-  // Load what's on the phone first (works offline), then refresh from the sheet when online.
+  // Load what's on the phone first (works offline), join a group from a link, then check for a new word list.
+  const [linkProblem, setLinkProblem] = useState<{ code: string; message: UIKey } | null>(null);
   useEffect(() => {
     setDbBlockedHandler(() => showToast(t('db.blocked'), { ms: 15000 }));
-    loadFromDb().then(() => navigator.onLine && syncNow());
+    loadFromDb()
+      .then(joinFromLink)
+      .then((problem) => {
+        setLinkProblem(problem);
+        if (navigator.onLine) void syncNow();
+      });
   }, []);
   useEffect(() => {
     if (!online || !s.loaded) return;
@@ -109,6 +146,43 @@ export function App() {
     return () => clearTimeout(id);
   }, [plan.later.nextAt, screen.name]);
 
+  // No group yet (there is no default group), a link with a bad code, or "another group" from the menu.
+  if (s.loaded && (!s.groupCode || linkProblem || screen.name === 'join')) {
+    const leave = s.groupCode ? () => { setLinkProblem(null); setScreen({ name: 'home' }); } : undefined;
+    return (
+      <div class="app">
+        <UpdateBanner />
+        <Toast />
+        <header class="topbar">
+          <div />
+          <div class="topbar-right">
+            {!online && <span class="offline-badge">{t('status.offline')}</span>}
+            <HelpButton screen="join" />
+          </div>
+        </header>
+        <JoinScreen
+          key={linkProblem?.code ?? 'join'}
+          initial={linkProblem?.code ?? ''}
+          message={linkProblem?.message ?? null}
+          onCancel={leave}
+          onJoined={() => {
+            setLinkProblem(null);
+            setScreen({ name: 'home' });
+          }}
+        />
+      </div>
+    );
+  }
+  // Joined, but the help language is not chosen yet (only asked when the group offers languages).
+  if (s.loaded && s.helpLang === null && s.group && s.group.languages.length) {
+    return (
+      <div class="app">
+        <Toast />
+        <LanguageScreen languages={s.group.languages} />
+      </div>
+    );
+  }
+
   if (screen.name === 'review') {
     return (
       <div class="app">
@@ -123,11 +197,12 @@ export function App() {
     <div class="app">
       <UpdateBanner />
       <Toast />
+      <GroupBanner />
       <header class="topbar">
         <Menu go={(name) => setScreen({ name } as Screen)} />
         <div class="topbar-right">
           {!online && <span class="offline-badge">{t('status.offline')}</span>}
-          <HelpButton screen={screen.name === 'home' ? 'home' : screen.name} />
+          <HelpButton screen={screen.name === 'home' || screen.name === 'join' ? 'home' : screen.name} />
         </div>
       </header>
       {screen.name === 'topics' ? (

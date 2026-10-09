@@ -4,6 +4,9 @@ import { setUserSetting, useSettingControls } from '../settings';
 import { SETTING_ROWS } from '../userSettings';
 import { BackupError, backupFileName, exportBackup, importBackup, previewBackup, readBackupFile, type Backup } from '../backup';
 import { usePersisted } from '../storage';
+import { useStore } from '../store';
+import { langName } from '../helpLang';
+import { setHelpLang } from '../language';
 import { loadFromDb } from '../store';
 import { showToast } from '../components/Toast';
 
@@ -12,6 +15,8 @@ export function SettingsScreen({ onDone }: { onDone: () => void }) {
   const c = useSettingControls();
   const [busy, setBusy] = useState(false);
   const persisted = usePersisted();
+  const store = useStore();
+  const languages = store.group?.languages ?? [];
   /** A checked backup that would replace records here: waits for "Vervangen" / "Annuleren". */
   const [pending, setPending] = useState<{ file: Backup; replace: number } | null>(null);
 
@@ -109,7 +114,26 @@ export function SettingsScreen({ onDone }: { onDone: () => void }) {
   return (
     <main class="topics settings">
       <h2 class="screen-title">{t('settings.title')}</h2>
-      <section class="setting-list">{SETTING_ROWS.map((r) => row(r.key, r.label))}</section>
+      <section class="setting-list">
+        {SETTING_ROWS.map((r) => row(r.key, r.label))}
+        {languages.length > 0 && (
+          <label class="setting-row">
+            <span class="setting-label">{t('settings.helpLang')}</span>
+            <select
+              class="setting-select"
+              value={store.helpLang ?? ''}
+              onChange={(e) => void setHelpLang((e.target as HTMLSelectElement).value, languages)}
+            >
+              {languages.map((l) => (
+                <option key={l} value={l} lang={l}>
+                  {langName(l)}
+                </option>
+              ))}
+              <option value="">{t('lang.none')}</option>
+            </select>
+          </label>
+        )}
+      </section>
 
       <h3 class="setting-head">{t('backup.title')}</h3>
       <section class="setting-list">

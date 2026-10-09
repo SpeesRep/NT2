@@ -72,7 +72,17 @@ export default defineConfig(({ mode, command }) => {
           // PROD's worker (scope /NT2/) must never answer for the DEV app under /NT2/dev/.
           globIgnores: isProd ? ['dev/**', 'icons/dev/**'] : ['icons/prod/**'],
           navigateFallback: `${base}index.html`,
-          navigateFallbackDenylist: isProd ? [/\/dev\//] : [],
+          // Group install pages (/g/<code>/) carry their OWN manifest (start_url with the code): the worker must never
+          // answer them with the app shell, or "Zet op beginscherm" would install the app without the code.
+          navigateFallbackDenylist: isProd ? [/\/dev\//, /\/g\//] : [/\/g\//],
+          // Fonts for non-Latin help languages: a runtime cache (src/fonts.ts can drop single files), never precached.
+          runtimeCaching: [
+            {
+              urlPattern: ({ url }) => url.pathname.startsWith(`${base}fonts/`),
+              handler: 'CacheFirst',
+              options: { cacheName: `${isProd ? 'speesrep-prod' : 'speesrep-dev'}-fonts` }
+            }
+          ],
           cleanupOutdatedCaches: true
         }
       })

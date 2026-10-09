@@ -1,7 +1,10 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import { NS } from './config';
 import { cardLabel } from './display';
-import { DEFAULT_SETTINGS, type Card, type CurriculumRow, type Settings, type Tag } from './types';
+import { DEFAULT_SETTINGS, type Card, type CurriculumRow, type GroupInfo, type Settings, type Tag } from './types';
+
+/** 'ok' = the group's list is published; 'stopped' = the group was deactivated; 'unknown' = no such code (any more). */
+export type GroupStatus = 'ok' | 'stopped' | 'unknown';
 import type { Progress, Snapshot, Track } from './scheduler';
 import type { Intro, Mode } from './session';
 import type { DoneToday, Round } from './today';
@@ -31,6 +34,10 @@ export type Meta = {
   tags: Tag[];
   lastSync: string; // ISO time of the last successful content check
   contentVersion: string; // `version` of the stored content.json
+  groupCode: string; // the student's group (the ONLY thing that identifies the group; never sent anywhere)
+  group: GroupInfo; // its display name and help languages (from content.json)
+  groupStatus: GroupStatus; // 'stopped' / 'unknown' after a check; the cards stay
+  helpLang: string; // chosen help language ('' = none); missing = not chosen yet
   intro: Intro; // new cards introduced today
   curriculum: CurriculumRow[];
   curriculumOpened: Record<string, string>; // latch: tag → local date it opened (src/curriculum.ts)

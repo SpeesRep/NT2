@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 // @ts-ignore — plain Node script without types
-import { checkExport, checkIds, lostIds, toContent } from '../scripts/build-content.mjs';
+import { checkExport, checkIds, groupPage, lostIds, toContent } from '../scripts/build-content.mjs';
 
 const card = (id: string, nl: string, fr = 'x') => ({ id, nl, fr, answer: '', tags: ['huis'] });
 const group = (over: Record<string, unknown> = {}) => ({
@@ -39,5 +39,20 @@ describe('per-group content.json', () => {
   it('reports ids that were published before and are gone', () => {
     expect(lostIds({ cards: [card('c_1', 'huis'), card('c_2', 'tafel')] }, { cards: [card('c_2', 'tafel')] })).toEqual(['c_1 (huis)']);
     expect(lostIds(null, { cards: [] })).toEqual([]);
+  });
+});
+
+describe('group install page', () => {
+  const html = '<head><link rel="manifest" href="/NT2/dev/manifest.webmanifest"></head>';
+  const manifest = JSON.stringify({ id: '/NT2/dev/', start_url: '/NT2/dev/', scope: '/NT2/dev/', icons: [{ src: 'icons/dev/icon-192.png' }, { src: '/abs.png' }] });
+  it('points the page at its own manifest whose start_url carries the code', () => {
+    const p = groupPage(html, manifest, '/NT2/dev/', 'abcdefgh')!;
+    expect(p.html).toContain('<link rel="manifest" href="manifest.webmanifest">');
+    const m = JSON.parse(p.manifest);
+    expect(m).toMatchObject({ id: '/NT2/dev/?groep=abcdefgh', start_url: '/NT2/dev/?groep=abcdefgh', scope: '/NT2/dev/' });
+    expect(m.icons.map((i: { src: string }) => i.src)).toEqual(['/NT2/dev/icons/dev/icon-192.png', '/abs.png']);
+  });
+  it('makes no page without a built app (PROD placeholder)', () => {
+    expect(groupPage('<p>La version PROD arrive bientôt.</p>', '', '/NT2/', 'abcdefgh')).toBeNull();
   });
 });

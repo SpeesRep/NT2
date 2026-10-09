@@ -1,15 +1,21 @@
 import { useState } from 'preact/hooks';
-import { HELP, t, type HelpScreen } from '../i18n';
+import { t, type HelpScreen } from '../i18n';
+import { helpText } from '../helpLang';
+import { useStore } from '../store';
 import { useSettings } from '../settings';
 import { helpSeen, isHelpUpdated, markHelpSeen } from '../helpSeen';
 
-/** "Hulp" button + panel with the French instructions for one screen. Hidden when show_french_help is off. */
+/**
+ * "Hulp" button + panel with the instructions for one screen in the student's help language. Hidden when
+ * show_french_help (= show help) is off, without a help language, or when that language has no text for the screen.
+ */
 export function HelpButton({ screen }: { screen: HelpScreen }) {
   const show = useSettings().show_french_help;
+  const lang = useStore().helpLang ?? '';
   const [open, setOpen] = useState(false);
   const [, rerender] = useState(0);
-  if (!show) return null;
-  const text = HELP[screen].fr;
+  const text = helpText(screen, lang);
+  if (!show || !text) return null;
   const updated = isHelpUpdated(helpSeen(screen), text);
   const openHelp = () => {
     markHelpSeen(screen, text);
@@ -29,7 +35,9 @@ export function HelpButton({ screen }: { screen: HelpScreen }) {
         <div class="sheet-backdrop" onClick={() => setOpen(false)}>
           <div class="sheet" role="dialog" aria-modal="true" aria-label={t('help.title')} onClick={(e) => e.stopPropagation()}>
             <h2>{t('help.title')}</h2>
-            <p lang="fr">{HELP[screen].fr}</p>
+            <p lang={lang} dir="auto">
+              {text}
+            </p>
             <button class="btn btn-primary btn-block" onClick={() => setOpen(false)}>
               {t('help.close')}
             </button>

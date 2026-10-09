@@ -176,6 +176,44 @@ var ADMIN_ACTIONS = {
     plan.dryRun = false;
     return plan;
   },
+  /**
+   * One-off: Tags.label_fr → TagTranslations (lang fr, reviewed), then the label_fr column is deleted. Dry run unless
+   * dryRun:false. Running it again after the column is gone changes nothing.
+   */
+  'admin.migrateTagLabels': function (b) {
+    var ss = ss_(), tags = ss.getSheetByName('Tags'), h = headersOf_(tags), col = h.indexOf('label_fr');
+    if (col === -1) return { done_before: true };
+    var rows = readTable_(tags).rows.filter(function (r) { return String(r.tag).trim() && String(r.label_fr || '').trim(); });
+    if (b.dryRun !== false) return { dryRun: true, fr_labels: rows.length };
+    var sh = ss.getSheetByName('TagTranslations') || ss.insertSheet('TagTranslations');
+    if (sh.getLastRow() === 0) sh.getRange(1, 1, 1, SCHEMA.TagTranslations.length).setValues([SCHEMA.TagTranslations]);
+    var existing = readTagTranslations_();
+    rows.forEach(function (r) { setTagTranslation_(String(r.tag).trim().toLowerCase(), 'fr', r.label_fr, 'reviewed', existing); });
+    tags.deleteColumn(col + 1);
+    applyV2Formats_(ss);
+    audit_('owner', 'migrateTagLabels', '');
+    return { dryRun: false, fr_labels: rows.length };
+  },
+  /** Bulk upsert of topic names: rows = [{tag, lang, label, status?}]. Dry run unless dryRun:false. */
+  'admin.setTagTranslations': function (b) {
+    var rows = Array.isArray(b.rows) ? b.rows : [];
+    var known = {};
+    readTable_(sheet_('Tags')).rows.forEach(function (r) { known[String(r.tag).trim().toLowerCase()] = true; });
+    var plan = { add: 0, update: 0, kept_reviewed: [], unknown: [] };
+    var ok = rows.filter(function (r) {
+      if (!r || !known[String(r.tag)] || !languages_([r.lang]) || !String(r.label || '').trim()) { plan.unknown.push(r && r.tag); return false; }
+      return true;
+    });
+    if (b.dryRun !== false) { plan.dryRun = true; plan.rows = ok.length; return plan; }
+    var existing = readTagTranslations_();
+    ok.forEach(function (r) {
+      var res = setTagTranslation_(String(r.tag), String(r.lang).toLowerCase(), r.label, r.status, existing);
+      if (res === 'kept') plan.kept_reviewed.push(r.tag); else plan[res]++;
+    });
+    audit_('owner', 'setTagTranslations ' + ok.length, '');
+    plan.dryRun = false;
+    return plan;
+  },
   /** Sets the deploy's read-only export key (only its SHA-256 is stored). */
   'admin.setExportKeyHash': function (b) {
     var h = String(b.hash || '').toLowerCase();

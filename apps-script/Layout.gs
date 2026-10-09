@@ -13,7 +13,8 @@ var LAYOUT = {
   Proposals: { proposal_id: 110, group_code: 100, teacher_id: 110, type: 90, card_id: 110, nl: 200, example_nl: 240,
     note: 260, status: 90, created: 140 },
   AuditLog: { timestamp: 150, teacher_id: 110, action: 160, group_code: 100 },
-  Tags: { tag: 120, label_nl: 170, label_fr: 170, description: 340, subject_nl: 130 },
+  Tags: { tag: 120, label_nl: 170, description: 340, subject_nl: 130 },
+  TagTranslations: { tag: 120, lang: 60, label: 200, status: 90, updated: 140 },
   Settings: { key: 230, value: 90, description: 560 }
 };
 var WRAP = { nl: 1, example_nl: 1, answer: 1, description: 1, text: 1, example: 1, note: 1, pos: 1, tags: 1 };

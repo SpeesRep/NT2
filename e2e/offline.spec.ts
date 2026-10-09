@@ -1,9 +1,16 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { expect, test, type Page, type Route } from '@playwright/test';
 
-// The app's only network use: content.json from its own origin (published by the content Action).
+// The app's only network use: its group's content.json from its own origin (built by the deploy).
 const ORIGIN = 'http://localhost:4174';
-const CONTENT = `${ORIGIN}/NT2/dev/content.json`;
+const CODE = 'abcd2345'; // a group code (8 characters of the code alphabet)
+const groupFile = (code: string) => `${ORIGIN}/NT2/dev/g/${code}/content.json`;
+
+/** A word card with French and English help texts. */
+const word = (id: string, nl: string, tags: string[]) => ({
+  id, type: 'word', nl, article: 'de', pos: 'noun', example_nl: '', tags, flags: [], added: '2026-09-27', active: true,
+  translations: { fr: { text: `fr-${nl}`, example: '' }, en: { text: `en-${nl}`, example: '' } }
+});
 
 function mockServer(
   settings: Record<string, unknown> = { new_per_day: 5, show_french_help: true },
@@ -11,11 +18,9 @@ function mockServer(
 ) {
   let version = 1;
   let fetches = 0;
-  const cards = ['huis', 'tafel', 'stoel', 'raam', 'boek'].map((nl, i) => ({
-    id: `c_${i}`, type: 'word', nl, article: 'de', pos: 'noun', fr: `fr-${nl}`, example_nl: '', example_fr: '',
-    tags: i < 2 ? ['huishouden'] : ['reizen'], flags: [], added: '2026-09-27', active: true
-  }));
-  cards.unshift(...(extraCards as typeof cards));
+  let active = true;
+  const cards: Record<string, unknown>[] = ['huis', 'tafel', 'stoel', 'raam', 'boek'].map((nl, i) => word(`c_${i}`, nl, i < 2 ? ['huishouden'] : ['reizen']));
+  cards.unshift(...extraCards);
   /** Every request the page or its service worker makes (method + URL). */
   const requests: { method: string; url: string }[] = [];
 
@@ -23,30 +28,43 @@ function mockServer(
     fetches: () => fetches,
     requests,
     /** A new word list is published (new version). */
-    publish(card: (typeof cards)[number]) {
+    publish(card: Record<string, unknown>) {
       cards.push(card);
       version++;
     },
+    /** The owner deactivates the group: its file becomes a stub. */
+    stop() {
+      active = false;
+    },
     async install(page: Page) {
       page.context().on('request', (r) => requests.push({ method: r.method(), url: r.url() }));
-      await page.context().route(CONTENT, async (route: Route) => {
+      // Any other code: 404, like GitHub Pages.
+      await page.context().route(`${ORIGIN}/NT2/dev/g/**`, (route: Route) => route.fulfill({ status: 404, body: 'not found' }));
+      await page.context().route(groupFile(CODE), async (route: Route) => {
         fetches++;
-        return route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            format: 1, version: `v${version}`, env: 'DEV', generated_at: new Date().toISOString(), cards, settings,
-            tags: [
-              { tag: 'huishouden', label_nl: 'huishouden', label_fr: 'la maison' },
-              { tag: 'reizen', label_nl: 'reizen', label_fr: 'voyages' },
-              { tag: 'emoji', label_nl: 'emoji', label_fr: 'emoji', subject_nl: 'Wat is dit?' }
-            ],
-            curriculum: ['emoji', 'huishouden', 'reizen'].map((tag, i) => ({ order: i + 1, tag, rule: 'always', date: '', percentage: null, from_tags: [] }))
-          })
-        });
+        const body = active
+          ? {
+              format: 1, code: CODE, active: true, version: `v${version}`, env: 'DEV', display_name: 'Groep Zon', languages: ['fr', 'en'],
+              cards, settings,
+              tags: [
+                { tag: 'huishouden', label_nl: 'huishouden', labels: { fr: 'la maison', en: 'home' } },
+                { tag: 'reizen', label_nl: 'reizen', labels: { fr: 'voyages', en: 'travel' } },
+                { tag: 'emoji', label_nl: 'emoji', subject_nl: 'Wat is dit?', labels: {} }
+              ],
+              curriculum: ['emoji', 'huishouden', 'reizen'].map((tag, i) => ({ order: i + 1, tag, rule: 'always', date: '', percentage: null, from_tags: [] }))
+            }
+          : { format: 1, code: CODE, active: false };
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
       });
     }
   };
+}
+
+/** Opens the app through the group's join link and picks a help language (French by default). */
+async function joinGroup(page: Page, language = 'Français') {
+  await page.goto(`/NT2/dev/?groep=${CODE}`);
+  await page.getByRole('button', { name: language }).click();
+  await expect(page.getByRole('button', { name: 'Starten' }).or(page.getByText('Klaar voor nu!'))).toBeVisible({ timeout: 20_000 });
 }
 
 /** Fails the test on any Content-Security-Policy violation. */
@@ -92,9 +110,11 @@ test('offline: review without internet, nothing is ever sent, a new word list ar
   await server.install(page);
 
   // 1. First launch online: content.json is downloaded and the service worker caches the app.
-  await page.goto('/NT2/dev/');
+  await joinGroup(page);
+  await expect(page).toHaveURL(/\/NT2\/dev\/$/); // the code left the address bar
   await inMenu(page, async () => {
     await expect(page.getByText('Bijgewerkt: zojuist')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText('Groep: Groep Zon')).toBeVisible();
     await expect(page.getByText('· 5 kaarten')).toBeVisible();
   });
   await page.evaluate(() => navigator.serviceWorker.ready);
@@ -113,10 +133,7 @@ test('offline: review without internet, nothing is ever sent, a new word list ar
   await expect(page.locator('.menu-dot')).toBeHidden();
 
   // 4. A new word list is published; internet comes back: the app picks it up by itself.
-  server.publish({
-    id: 'c_new', type: 'word', nl: 'deur', article: 'de', pos: 'noun', fr: 'la porte', example_nl: '', example_fr: '',
-    tags: ['huishouden'], flags: [], added: '2026-09-28', active: true
-  });
+  server.publish({ ...word('c_new', 'deur', ['huishouden']), added: '2026-09-28' });
   await context.setOffline(false);
   await inMenu(page, () => expect(page.getByText('· 6 kaarten')).toBeVisible({ timeout: 20_000 }));
 
@@ -152,7 +169,7 @@ test("topics, the Vandaag bar, stop and resume, and Klaar voor nu (no sessions, 
   // unlock_prod_stability_days high: a Makkelijk word does not open its FR→NL side today (keeps the numbers simple).
   const server = mockServer({ new_per_day: 5, unlock_prod_stability_days: 365, show_french_help: true });
   await server.install(page);
-  await page.goto('/NT2/dev/');
+  await joinGroup(page);
   await waitSynced(page);
 
   // Kies een onderwerp: only "huishouden" → 2 new cards.
@@ -193,7 +210,7 @@ test("topics, the Vandaag bar, stop and resume, and Klaar voor nu (no sessions, 
 test('enkel/emoji card, 🔊 without a Dutch voice, and 🚩 flags (flag, note, list, copy, resolve)', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   const emoji = {
-    id: 'E-01', type: 'oneway', nl: '🛏️', article: '', pos: 'emoji', fr: '', example_nl: '', example_fr: '', tags: ['emoji'],
+    id: 'E-01', type: 'oneway', nl: '🛏️', article: '', pos: 'emoji', example_nl: '', translations: {}, tags: ['emoji'],
     flags: [], answer: 'het bed', added: '2026-09-01', active: true
   };
   const server = mockServer({ new_per_day: 5, show_french_help: true }, [emoji]);
@@ -204,7 +221,7 @@ test('enkel/emoji card, 🔊 without a Dutch voice, and 🚩 flags (flag, note, 
     const orig = speechSynthesis.getVoices.bind(speechSynthesis);
     speechSynthesis.getVoices = () => orig().filter((v) => !/^nl/i.test(v.lang));
   });
-  await page.goto('/NT2/dev/');
+  await joinGroup(page);
   await waitSynced(page);
 
   // The oldest card comes first: the emoji card, with its subject label; the answer only after the reveal.
@@ -267,7 +284,7 @@ test('backup: save as a file, restore on a fresh device, ask before replacing ne
   const server = mockServer({ new_per_day: 5, unlock_prod_stability_days: 365, show_french_help: true });
   const csp = watchCsp(page);
   await server.install(page);
-  await page.goto('/NT2/dev/');
+  await joinGroup(page);
   await waitSynced(page);
   const openSettings = async () => {
     await page.getByRole('button', { name: 'Menu openen' }).click();
@@ -320,7 +337,7 @@ test('backup: save as a file, restore on a fresh device, ask before replacing ne
     const r = indexedDB.deleteDatabase('speesrep-dev');
     r.onsuccess = r.onerror = r.onblocked = () => res(null);
   }));
-  await page.goto('/NT2/dev/');
+  await joinGroup(page);
   await waitSynced(page);
   expect(await progressCount()).toBe(0);
   await openSettings();
@@ -351,5 +368,65 @@ test('backup: save as a file, restore on a fresh device, ask before replacing ne
   writeFileSync(junk, '{"hello":1}');
   await page.locator('input[type=file]').setInputFiles(junk);
   await expect(page.getByText('Dit is geen SpeesRep-back-up.')).toBeVisible();
+  expect(csp).toEqual([]);
+});
+
+test('group code, help language and a stopped group (no default group, nothing sent)', async ({ page, context }) => {
+  const server = mockServer({ new_per_day: 5, unlock_prod_stability_days: 365, show_french_help: true });
+  const csp = watchCsp(page);
+  await server.install(page);
+
+  // 1. First start without a code: the code screen, not a default list.
+  await page.goto('/NT2/dev/');
+  await expect(page.getByRole('heading', { name: 'Je groep' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Starten' })).toHaveCount(0);
+  const input = page.getByLabel('Code van je groep');
+  await input.fill('abc');
+  await page.getByRole('button', { name: 'Verder' }).click();
+  await expect(page.getByText('Een code heeft 8 letters en cijfers.')).toBeVisible();
+  await input.fill('zzzz2222');
+  await page.getByRole('button', { name: 'Verder' }).click();
+  await expect(page.getByText('Deze code bestaat niet.')).toBeVisible();
+
+  // 2. The right code, typed the way a student might (capitals, a space) → the help language.
+  await input.fill(CODE.toUpperCase().slice(0, 4) + ' ' + CODE.slice(4));
+  await page.getByRole('button', { name: 'Verder' }).click();
+  await expect(page.getByRole('heading', { name: 'Je hulptaal' })).toBeVisible();
+  await page.getByRole('button', { name: 'English' }).click();
+
+  // 3. Cards and help in English, with lang + dir="auto".
+  await page.getByRole('button', { name: 'Hulp' }).click();
+  await expect(page.getByRole('dialog').locator('p[lang="en"][dir="auto"]')).toContainText('Tap “SpeesRep” at the top for the menu');
+  await page.getByRole('dialog').getByRole('button').last().click();
+  await page.getByRole('button', { name: 'Starten' }).click();
+  const overlay = page.getByRole('dialog', { name: 'De vier knoppen' });
+  await page.getByRole('button', { name: 'Antwoord tonen' }).click();
+  if (await overlay.isVisible()) {
+    await expect(overlay).toContainText('I didn’t know');
+    await overlay.getByRole('button', { name: 'Klaar' }).click();
+  }
+  await expect(page.locator('.card-answer[lang="en"][dir="auto"]')).toHaveText(/^en-/);
+  await page.getByRole('button', { name: /Terug/ }).click();
+
+  // 4. Switching the help language works offline (all languages are on the device).
+  await context.setOffline(true);
+  await page.getByRole('button', { name: 'Menu openen' }).click();
+  await page.getByRole('menuitem', { name: /Instellingen/ }).click();
+  await page.getByLabel('Hulptaal').selectOption('fr');
+  await page.getByRole('button', { name: 'Klaar' }).click();
+  await page.getByRole('button', { name: 'Starten' }).click();
+  await page.getByRole('button', { name: 'Antwoord tonen' }).click();
+  await expect(page.locator('.card-answer[lang="fr"]')).toHaveText(/^fr-/);
+  await page.getByRole('button', { name: /Terug/ }).click();
+  await context.setOffline(false);
+
+  // 5. The owner stops the group: the cards and progress stay, a short message appears.
+  server.stop();
+  await page.reload();
+  await expect(page.getByText('Je groep is gestopt. Je kunt blijven oefenen.')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('button', { name: 'Starten' }).or(page.getByText('Klaar voor nu!'))).toBeVisible();
+
+  // Nothing was ever sent: only GETs to the app's own origin.
+  expect(server.requests.filter((r) => !r.url.startsWith(ORIGIN) || r.method !== 'GET')).toEqual([]);
   expect(csp).toEqual([]);
 });

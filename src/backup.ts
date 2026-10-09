@@ -15,10 +15,10 @@ export type Backup = {
   progress: Progress[];
   queue?: ReviewEvent[]; // Fanki-era outbox; SpeesRep neither writes nor reads it
   flags: StudentFlag[];
-  meta: Partial<Pick<Meta, 'intro' | 'doneToday' | 'dayCounts' | 'studyTags' | 'userSettings' | 'curriculumOpened'>>;
+  meta: Partial<Pick<Meta, 'intro' | 'doneToday' | 'dayCounts' | 'studyTags' | 'userSettings' | 'curriculumOpened' | 'groupCode' | 'helpLang'>>;
 };
 
-const META_KEYS = ['intro', 'doneToday', 'dayCounts', 'studyTags', 'userSettings', 'curriculumOpened'] as const;
+const META_KEYS = ['intro', 'doneToday', 'dayCounts', 'studyTags', 'userSettings', 'curriculumOpened', 'groupCode', 'helpLang'] as const;
 
 export async function exportBackup(now = new Date()): Promise<Backup> {
   const d = await db();
@@ -136,6 +136,11 @@ export async function importBackup(raw: unknown, now = new Date()): Promise<{ pr
   const meta = tx.objectStore('meta');
   if (b.meta.userSettings) await meta.put({ key: 'userSettings', value: cleanUserSettings(b.meta.userSettings) });
   if (Array.isArray(b.meta.studyTags)) await meta.put({ key: 'studyTags', value: b.meta.studyTags });
+  // The group and help language only when this device has none yet (a new phone); never overwrite a choice here.
+  if (typeof b.meta.groupCode === 'string' && /^[a-z2-9]{8}$/.test(b.meta.groupCode) && !(await meta.get('groupCode'))) {
+    await meta.put({ key: 'groupCode', value: b.meta.groupCode });
+  }
+  if (typeof b.meta.helpLang === 'string' && (await meta.get('helpLang')) === undefined) await meta.put({ key: 'helpLang', value: b.meta.helpLang });
   if (b.meta.dayCounts) {
     const cur = ((await meta.get('dayCounts'))?.value ?? {}) as Record<string, number>;
     const merged = { ...cur };

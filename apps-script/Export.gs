@@ -15,9 +15,10 @@ function exportGroups_() {
   }
   var bank = t.rows.filter(cardServed_);
   var groupCards = readGroupCards_(), tr = readTranslations_();
+  var tagNames = readTagTranslations_();
   var allTags = readTable_(sheet_('Tags')).rows.map(function (r) {
-    return { tag: String(r.tag).trim().toLowerCase(), label_nl: String(r.label_nl || r.tag || ''), label_fr: String(r.label_fr || ''),
-      subject_nl: String(r.subject_nl || '').trim() };
+    var tag = String(r.tag).trim().toLowerCase();
+    return { tag: tag, label_nl: String(r.label_nl || r.tag || ''), subject_nl: String(r.subject_nl || '').trim(), names: tagNames[tag] || {} };
   }).filter(function (x) { return x.tag; });
   var settings = readSettings_();
   var out = groups.map(function (g) {
@@ -35,7 +36,12 @@ function exportGroups_() {
     return {
       code: g.group_code, active: true, display_name: g.display_name, languages: g.languages,
       cards: cards, curriculum: curriculum, settings: settings,
-      tags: allTags.filter(function (x) { return used[x.tag]; })
+      // Topic names only in the group's languages: {tag, label_nl, subject_nl, labels: {fr: …}}.
+      tags: allTags.filter(function (x) { return used[x.tag]; }).map(function (x) {
+        var labels = {};
+        g.languages.forEach(function (l) { if (x.names[l]) labels[l] = x.names[l].label; });
+        return { tag: x.tag, label_nl: x.label_nl, subject_nl: x.subject_nl, labels: labels };
+      })
     };
   });
   return { env: env_(), exported_at: new Date().toISOString(), groups: out };

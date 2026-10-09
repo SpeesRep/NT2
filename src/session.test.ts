@@ -6,7 +6,7 @@ import type { Card } from './types';
 const now = new Date('2026-09-28T10:00:00');
 const settings = { new_per_day: 3, unlock_prod_stability_days: 3, due_window_minutes: 10, max_reviews_per_day: 100 };
 const card = (id: string, type: Card['type'] = 'word', added = '2026-09-27'): Card =>
-  ({ id, type, nl: id, article: '', pos: '', fr: id, example_nl: '', example_fr: '', tags: [], flags: [], answer: '', added, active: true }) as Card;
+  ({ id, type, nl: id, article: '', pos: '', help: id, example_nl: '', help_example: '', tags: [], flags: [], answer: '', added, active: true }) as Card;
 const prog = (id: string, track: 'recog' | 'prod', due: string, stability = 1): Progress => ({
   key: progressKey(id, track), card_id: id, track, state: 'Review', due, stability, difficulty: 5, reps: 2, lapses: 0,
   last_review: '2026-09-20T10:00:00.000Z', learning_steps: 0, scheduled_days: 1

@@ -4,11 +4,13 @@ import { t } from '../i18n';
 import { useStore } from '../store';
 import { SyncBox } from './SyncBox';
 
-/** Tap the app name ("SpeesRep") → menu: Voortgang, Gemarkeerd, Instellingen, Over SpeesRep, then the sync status. A red dot on the title when cards are marked or answers are not sent yet. */
-export function Menu({ go }: { go: (screen: 'progress' | 'marked' | 'settings' | 'about') => void }) {
+/** Tap the app name ("SpeesRep") → menu: Voortgang, Gemarkeerd, Instellingen, Over SpeesRep, Groep (another code), then the word-list status. A red dot on the title when cards are marked or answers are not sent yet. */
+type Target = 'progress' | 'marked' | 'settings' | 'about' | 'join';
+
+export function Menu({ go }: { go: (screen: Target) => void }) {
   const s = useStore();
   const [open, setOpen] = useState(false);
-  const pick = (screen: 'progress' | 'marked' | 'settings' | 'about') => {
+  const pick = (screen: Target) => {
     setOpen(false);
     go(screen);
   };
@@ -39,6 +41,11 @@ export function Menu({ go }: { go: (screen: 'progress' | 'marked' | 'settings' |
             <button class="menu-item" role="menuitem" onClick={() => pick('about')}>
               <span aria-hidden="true">ℹ️</span> {t('about.title')}
             </button>
+            {s.group && (
+              <button class="menu-item" role="menuitem" onClick={() => pick('join')}>
+                <span aria-hidden="true">👥</span> {t('group.menu', { name: s.group.display_name || s.group.code })}
+              </button>
+            )}
             <SyncBox />
             <button class="btn btn-secondary btn-block" onClick={() => setOpen(false)}>
               {t('help.close')}

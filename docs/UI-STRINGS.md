@@ -116,6 +116,23 @@ She sees **nl**. **fr** is hidden help: shown only in the "Hulp" panel and the o
 | `rating.helpTitle` | De vier knoppen | Les quatre boutons |
 | `rating.helpOk` | Klaar | Compris |
 | `rating.helpReopen` | Uitleg van de knoppen | Explication des boutons |
+| `join.title` | Je groep | Ton groupe |
+| `join.text` | Typ de code van je groep. Je krijgt de code van je leraar. | Tape le code de ton groupe. Ton professeur te donne le code. |
+| `join.label` | Code van je groep | Code de ton groupe |
+| `join.button` | Verder | Continuer |
+| `join.busy` | Even zoeken… | Recherche… |
+| `join.bad` | Een code heeft 8 letters en cijfers. | Un code a 8 lettres et chiffres. |
+| `join.unknown` | Deze code bestaat niet. | Ce code n’existe pas. |
+| `join.stopped` | Deze groep is gestopt. | Ce groupe est arrêté. |
+| `join.offline` | Geen internet. Probeer het opnieuw. | Pas d’internet. Réessaie. |
+| `join.cancel` | Terug | Retour |
+| `lang.title` | Je hulptaal | Ta langue d’aide |
+| `lang.text` | In welke taal wil je hulp? | Dans quelle langue veux-tu de l’aide ? |
+| `lang.none` | Geen hulptaal | Pas de langue d’aide |
+| `group.menu` | Groep: {name} | Groupe : {name} |
+| `group.stopped` | Je groep is gestopt. Je kunt blijven oefenen. | Ton groupe est arrêté. Tu peux continuer à t’exercer. |
+| `group.unknown` | Je groep bestaat niet meer. Je kunt blijven oefenen. | Ton groupe n’existe plus. Tu peux continuer à t’exercer. |
+| `settings.helpLang` | Hulptaal | Langue d’aide |
 
 ## Rating buttons (left to right)
 
@@ -143,8 +160,10 @@ She sees **nl**. **fr** is hidden help: shown only in the "Hulp" panel and the o
 |---|---|
 | home | Touche « SpeesRep » en haut pour le menu : « Voortgang » (ta progression) et « Gemarkeerd » (cartes marquées 🚩). Cet écran montre combien de cartes tu dois revoir aujourd’hui (« te herhalen ») et combien de nouvelles cartes t’attendent (« nieuw vandaag »). La barre « Vandaag » montre ton travail du jour ; « Nog 5 kaarten » = encore 5 cartes. Touche « Starten » pour commencer ; tu peux t’arrêter quand tu veux (« Terug »), tout est gardé. « Klaar voor nu! » = fini pour le moment ; « Volgende kaarten: 3 over ± 15 min » = 3 cartes reviennent dans environ 15 minutes ; elles arrivent alors dans « Vandaag » et « Starten » revient. L’appli fonctionne aussi sans internet : tes réponses restent sur le téléphone et ne sont jamais envoyées. Dans le menu (touche « SpeesRep » en haut) : « Bijwerken » télécharge la nouvelle liste de mots quand tu as internet (ça se fait aussi tout seul). Chaque écran a sa propre page « Hulp » : touche « Hulp » là où tu es. |
 | about | Cette page explique SpeesRep : à quoi sert l’appli, que ta progression reste sur ton téléphone (pas de compte, pas de nom, pas d’e-mail) et d’où viennent les images (OpenMoji, licence CC BY-SA 4.0). |
-| settings | Ces réglages restent sur ton téléphone. « Max. aantal nieuwe woorden per dag » = combien de nouveaux mots au maximum chaque jour (« Standaard » = le choix de ton professeur). « Luisteroefeningen » = parfois la carte commence seulement par le son ; « Uit » = jamais. « Antwoord voorlezen » = le téléphone lit la réponse néerlandaise à voix haute quand tu la montres. « Back-up opslaan » enregistre ta progression dans un fichier ; « Back-up terugzetten » la remet depuis ce fichier (par exemple sur un nouveau téléphone). Les changements comptent tout de suite, pour la prochaine carte. |
+| settings | Ces réglages restent sur ton téléphone. « Max. aantal nieuwe woorden per dag » = combien de nouveaux mots au maximum chaque jour (« Standaard » = le choix de ton professeur). « Luisteroefeningen » = parfois la carte commence seulement par le son ; « Uit » = jamais. « Antwoord voorlezen » = le téléphone lit la réponse néerlandaise à voix haute quand tu la montres. « Hulptaal » = la langue de l’aide (ou aucune). « Back-up opslaan » enregistre ta progression dans un fichier ; « Back-up terugzetten » la remet depuis ce fichier (par exemple sur un nouveau téléphone). Les changements comptent tout de suite, pour la prochaine carte. |
 | progress | Ta progression : « kaarten geoefend » = cartes déjà travaillées, « kaarten bekend » = cartes bien sues, « herhalingen deze week » = révisions des 7 derniers jours, « dagen op rij » = jours de suite. En bas : combien de cartes reviennent aujourd’hui (vandaag), demain (morgen) et cette semaine (deze week). |
 | marked | Ici, les cartes que tu as marquées avec 🚩 pendant les révisions, les plus récentes en haut. « Opgelost » = résolu : la carte passe dans la liste « Opgelost » (rien n’est effacé). « Delen » = partager la liste (Messages, e-mail…) avec ton prof ou quelqu’un d’autre : c’est toi qui l’envoies, rien ne part tout seul. |
 | topics | Choisis un ou plusieurs thèmes : « Starten » ne montre plus que les cartes de ces thèmes (révisions et nouvelles cartes). « Alle onderwerpen » = tous les thèmes. 🔒 « nog dicht » = pas encore ouvert : ce thème s’ouvrira plus tard (à une date, ou quand tu connais bien d’autres thèmes). Touche « Klaar » pour revenir. |
 | review | Lis la carte et essaie de te souvenir de la réponse. Touche « Antwoord tonen » pour la voir, puis dis honnêtement comment ça s’est passé : ❌ Opnieuw = je ne savais pas, 😅 Moeilijk = j’ai hésité, ✅ Goed = bien, 😎 Makkelijk = très facile. Sous chaque bouton : quand la carte reviendra (min = minutes, u = heures, d = jours, wk = semaines, mnd = mois, jr = ans). Les noms montrent toujours « de » ou « het ». Badges : « valse vriend » = faux ami, « afkorting » = abréviation. « Terug » = retour à l’accueil : tu peux t’arrêter quand tu veux, tout est gardé. 🔊 = écouter le mot en néerlandais. Parfois la carte commence seulement par le son (« Wat hoor je? ») : écoute, devine, puis « Antwoord tonen ». S’il n’y a pas de voix néerlandaise sur ton téléphone : iPhone : Réglages › Accessibilité › Contenu énoncé › Voix › Néerlandais ; Android : Paramètres › Synthèse vocale › Installer les données vocales › Néerlandais. 🚩 en haut de la carte = marquer une carte qui te pose question (appui long ou « + notitie » pour ajouter une note). |
+| join | Tape le code de ton groupe (8 lettres et chiffres). Ton professeur te donne le code, souvent avec un lien ou un QR-code : avec le lien, tu n’as rien à taper. Ta progression reste sur ton téléphone ; le code est la seule chose que l’appli garde sur ton groupe. |
+| language | Choisis la langue de l’aide : les explications et les traductions des cartes apparaissent dans cette langue. « Geen hulptaal » = seulement le néerlandais. Tu peux changer plus tard dans le menu › Instellingen. |

@@ -4,7 +4,7 @@ import type { Card } from './types';
 
 const v = (lang: string, name = lang, localService = true) => ({ lang, name, localService });
 const card = (over: Partial<Card>): Card =>
-  ({ id: 'c1', type: 'word', nl: 'huis', article: 'het', pos: '', fr: 'maison', example_nl: '', example_fr: '', tags: [], flags: [], answer: '', added: '', active: true, ...over }) as Card;
+  ({ id: 'c1', type: 'word', nl: 'huis', article: 'het', pos: '', help: 'maison', example_nl: '', help_example: '', tags: [], flags: [], answer: '', added: '', active: true, ...over }) as Card;
 
 describe('Dutch voice', () => {
   it('prefers nl-NL, then nl-BE, then any nl; local voices first', () => {

@@ -11,7 +11,7 @@ import { DEFAULT_SETTINGS, type Card } from './types';
 import { progressKey, type Progress } from './scheduler';
 
 const sheet = { ...DEFAULT_SETTINGS, new_per_day: 10, listen_share: 1 };
-const word = { id: 'w1', type: 'word', nl: 'huis', article: 'het', pos: '', fr: 'maison', example_nl: '', example_fr: '', tags: [], flags: [], answer: '', added: '2026-10-01', active: true } as Card;
+const word = { id: 'w1', type: 'word', nl: 'huis', article: 'het', pos: '', help: 'maison', example_nl: '', help_example: '', tags: [], flags: [], answer: '', added: '2026-10-01', active: true } as Card;
 
 beforeEach(() => {
   indexedDB = new IDBFactory();

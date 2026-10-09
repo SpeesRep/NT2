@@ -83,9 +83,12 @@ export function previewOutcomes(sched: FSRS, card_id: string, track: Track, prev
   return out;
 }
 
-/** Tracks a card has: word → recog (+ prod once unlocked); sentence/question → prod only. */
+/**
+ * Tracks a card has: word → recog (+ prod once unlocked); sentence/question → prod only. A word without a help text
+ * in the chosen language has no prompt for the prod direction, so it stays recog only (FSRS itself is unchanged).
+ */
 export function tracksFor(card: Card, recog: Progress | undefined, settings: Pick<Settings, 'unlock_prod_stability_days'>): Track[] {
   if (card.type !== 'word') return ['prod'];
-  const prodUnlocked = !!recog && recog.state !== 'New' && recog.stability >= settings.unlock_prod_stability_days;
+  const prodUnlocked = !!card.help && !!recog && recog.state !== 'New' && recog.stability >= settings.unlock_prod_stability_days;
   return prodUnlocked ? ['recog', 'prod'] : ['recog'];
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
-import { allCards, allProgress, getMeta, getSettings } from './db';
-import { DEFAULT_SETTINGS, type Card, type CurriculumRow, type Settings, type Tag } from './types';
+import { allCards, allProgress, getMeta, getSettings, type GroupStatus } from './db';
+import { DEFAULT_SETTINGS, type Card, type CurriculumRow, type GroupInfo, type Settings, type Tag } from './types';
+import { withHelpLang } from './helpLang';
 import type { Progress } from './scheduler';
 import { todaysDone, todaysRound, type DoneToday, type Round } from './today';
 import { cleanUserSettings, EMPTY_USER_SETTINGS, type UserSettings } from './userSettings';
@@ -11,7 +12,11 @@ export type SyncStatus = 'idle' | 'syncing' | 'ok' | 'error';
 
 export type State = {
   loaded: boolean;
-  cards: Card[];
+  cards: Card[]; // as the student sees them: help texts in the chosen language (withHelpLang)
+  groupCode: string | null; // null = not joined yet (the app shows the code screen)
+  group: GroupInfo | null;
+  groupStatus: GroupStatus;
+  helpLang: string | null; // null = not chosen yet, '' = none
   settings: Settings;
   tags: Tag[];
   lastSync: string | null;
@@ -34,6 +39,10 @@ export type State = {
 let state: State = {
   loaded: false,
   cards: [],
+  groupCode: null,
+  group: null,
+  groupStatus: 'ok',
+  helpLang: null,
   settings: DEFAULT_SETTINGS,
   tags: [],
   lastSync: null,
@@ -79,7 +88,8 @@ export function byAdded(a: Card & { order?: number }, b: Card & { order?: number
 }
 
 export async function loadFromDb(): Promise<void> {
-  const [cards, settings, tags, lastSync, progress, intro, curriculum, studyTags, doneToday, dayCounts, userSettings, round, curriculumOpened] = await Promise.all([
+  const [cards, settings, tags, lastSync, progress, intro, curriculum, studyTags, doneToday, dayCounts, userSettings, round, curriculumOpened,
+    groupCode, group, groupStatus, helpLang] = await Promise.all([
     allCards(),
     getSettings(),
     getMeta('tags'),
@@ -92,11 +102,19 @@ export async function loadFromDb(): Promise<void> {
     getMeta('dayCounts'),
     getMeta('userSettings'),
     getMeta('round'),
-    getMeta('curriculumOpened')
+    getMeta('curriculumOpened'),
+    getMeta('groupCode'),
+    getMeta('group'),
+    getMeta('groupStatus'),
+    getMeta('helpLang')
   ]);
   setState({
     loaded: true,
-    cards: cards.sort(byAdded),
+    cards: withHelpLang(cards, helpLang ?? '').sort(byAdded),
+    groupCode: groupCode ?? null,
+    group: group ?? null,
+    groupStatus: groupStatus ?? 'ok',
+    helpLang: helpLang ?? null,
     settings,
     tags: tags ?? [],
     lastSync: lastSync ?? null,

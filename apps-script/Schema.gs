@@ -19,7 +19,8 @@ var SCHEMA = {
   Curriculum: ['group_code', 'order', 'tag', 'regel', 'datum', 'percentage', 'van_tags', 'version'],
   Proposals: ['proposal_id', 'group_code', 'teacher_id', 'type', 'card_id', 'nl', 'example_nl', 'note', 'status', 'created'],
   AuditLog: ['timestamp', 'teacher_id', 'action', 'group_code'],
-  Tags: ['tag', 'label_nl', 'label_fr', 'description', 'subject_nl'],
+  Tags: ['tag', 'label_nl', 'description', 'subject_nl'],
+  TagTranslations: ['tag', 'lang', 'label', 'status', 'updated'], // topic names per help language (rows, not columns)
   Settings: ['key', 'value', 'description']
 };
 /** Fanki tabs that v2 no longer uses (student data and its views); the migration lists them, dropTabs removes. */

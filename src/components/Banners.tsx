@@ -3,6 +3,7 @@ import type { JSX } from 'preact';
 import { isIosBrowser, isStandalone, useNeedRefresh } from '../pwa';
 import { NS } from '../config';
 import { t } from '../i18n';
+import { useStore } from '../store';
 
 export function UpdateBanner() {
   const [need, reload] = useNeedRefresh();
@@ -13,6 +14,17 @@ export function UpdateBanner() {
       <button class="btn btn-small" onClick={reload}>
         {t('update.open')}
       </button>
+    </div>
+  );
+}
+
+/** The group was stopped or its code no longer exists: the cards and progress stay, practising goes on. */
+export function GroupBanner() {
+  const status = useStore().groupStatus;
+  if (status === 'ok') return null;
+  return (
+    <div class="banner banner-group" role="status">
+      <span>{t(status === 'stopped' ? 'group.stopped' : 'group.unknown')}</span>
     </div>
   );
 }

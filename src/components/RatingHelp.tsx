@@ -1,6 +1,8 @@
 import { useState } from 'preact/hooks';
 import { NS } from '../config';
 import { RATINGS, t } from '../i18n';
+import { ratingMeaning } from '../helpLang';
+import { useStore } from '../store';
 import { useSettings } from '../settings';
 
 const SEEN_KEY = `${NS}:rating-help-seen`;
@@ -14,14 +16,15 @@ function seen(): boolean {
 }
 
 /**
- * One-time overlay (first review session) explaining the four buttons in French, plus a small "?"
- * that reopens it. This is the only place the button labels are translated. Hidden when
- * Settings.show_french_help is FALSE.
+ * One-time overlay (first review session) explaining the four buttons in the student's help language, plus a
+ * small "?" that reopens it. This is the only place the button labels are translated. Hidden when
+ * Settings.show_french_help is FALSE or there is no help language.
  */
 export function RatingHelp() {
   const show = useSettings().show_french_help;
+  const lang = useStore().helpLang ?? '';
   const [open, setOpen] = useState(() => !seen());
-  if (!show) return null;
+  if (!show || !ratingMeaning(RATINGS[0], lang)) return null;
   const close = () => {
     try {
       localStorage.setItem(SEEN_KEY, '1');
@@ -45,8 +48,10 @@ export function RatingHelp() {
                   <span class="rating-emoji" aria-hidden="true">
                     {r.emoji}
                   </span>
-                  <strong lang="nl">{r.nl}</strong>
-                  <span lang="fr">= {r.fr}</span>
+                  <strong lang="nl" dir="auto">{r.nl}</strong>
+                  <span lang={lang} dir="auto">
+                    = {ratingMeaning(r, lang)}
+                  </span>
                 </li>
               ))}
             </ul>

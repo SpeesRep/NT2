@@ -186,7 +186,7 @@ function curriculumEditorUndo(version) {
   });
 }
 
-/** "Nieuw onderwerp": a new Tags row (key a-z0-9-, label_nl, label_fr). Its Curriculum row (dicht) is added at once. */
+/** "Nieuw onderwerp": a new Tags row (key a-z0-9-, label_nl) + its French name in TagTranslations. Its Curriculum row (dicht) is added at once. */
 function curriculumEditorNewTopic(tag, labelNl, labelFr, version) {
   requireTeacher_();
   var key = String(tag || '').trim().toLowerCase();
@@ -197,7 +197,8 @@ function curriculumEditorNewTopic(tag, labelNl, labelFr, version) {
     var have = readTable_(sh).rows.map(function (r) { return String(r.tag).trim().toLowerCase(); });
     if (have.indexOf(key) !== -1) throw new Error('Onderwerp "' + key + '" bestaat al.');
     sh.getRange(nextRow_(sh, 1), 1, 1, SCHEMA.Tags.length).setValues([rowFromObject_(SCHEMA.Tags,
-      { tag: key, label_nl: String(labelNl).trim(), label_fr: String(labelFr || '').trim(), description: '', subject_nl: '' })]);
+      { tag: key, label_nl: String(labelNl).trim(), description: '', subject_nl: '' })]);
+    if (String(labelFr || '').trim()) setTagTranslation_(key, 'fr', labelFr, 'reviewed');
     var cur = sheet_('Curriculum');
     var same = curriculumVersion_(curriculumTabValues_(cur, code)) === version;
     if (same) appendMissingTopics_(cur, [key], code);

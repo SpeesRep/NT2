@@ -10,7 +10,7 @@ const now = new Date('2026-10-04T10:00:00');
 const at = (min: number) => new Date(now.getTime() + min * 60_000).toISOString();
 const settings = { new_per_day: 2, unlock_prod_stability_days: 3, due_window_minutes: 10, max_reviews_per_day: 100 };
 const card = (id: string): Card =>
-  ({ id, type: 'word', nl: id, article: '', pos: '', fr: id, example_nl: '', example_fr: '', tags: [], flags: [], answer: '', added: '2026-10-01', active: true }) as Card;
+  ({ id, type: 'word', nl: id, article: '', pos: '', help: id, example_nl: '', help_example: '', tags: [], flags: [], answer: '', added: '2026-10-01', active: true }) as Card;
 const prog = (id: string, due: string, state: Progress['state'] = 'Review'): Progress => ({
   key: progressKey(id, 'recog'), card_id: id, track: 'recog', state, due, stability: 1, difficulty: 5, reps: 2, lapses: 0,
   last_review: at(-1440), learning_steps: 0, scheduled_days: 1

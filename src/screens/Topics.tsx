@@ -6,7 +6,10 @@ import { useSettings } from '../settings';
 import { curriculumStatus, topicChoices } from '../curriculum';
 import { localDate } from '../session';
 
-/** "Kies een onderwerp": choose one or more tags; the next sessions use only cards with any of them. */
+/**
+ * "Kies een onderwerp": choose one or more tags; the next sessions use only cards with any of them. The topic's name
+ * in the help language (TagTranslations) is shown small under the Dutch name.
+ */
 export function Topics({ onDone }: { onDone: () => void }) {
   const s = useStore();
   const settings = useSettings();
@@ -17,12 +20,13 @@ export function Topics({ onDone }: { onDone: () => void }) {
     for (const c of s.cards) for (const tag of c.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
     const cur = curriculumStatus(s.curriculum, s.cards, s.progress, settings, localDate(), s.curriculumOpened, s.tags.map((tg) => tg.tag));
     const label = new Map(s.tags.map((tg) => [tg.tag, tg.label_nl || tg.tag]));
+    const helpLabel = new Map(s.tags.map((tg) => [tg.tag, (s.helpLang && tg.labels?.[s.helpLang]) || '']));
     // Only topics with a Curriculum row that is not dicht (and that have cards); 🔒 = not open yet.
     return topicChoices(cur)
       .filter((c) => counts.has(c.tag))
-      .map((c) => ({ tag: c.tag, label: label.get(c.tag) ?? c.tag, count: counts.get(c.tag)!, locked: c.locked }))
+      .map((c) => ({ tag: c.tag, label: label.get(c.tag) ?? c.tag, help: helpLabel.get(c.tag) ?? '', count: counts.get(c.tag)!, locked: c.locked }))
       .sort((a, b) => a.label.localeCompare(b.label, 'nl', { sensitivity: 'base' })); // alphabetical
-  }, [s.cards, s.tags, s.curriculum, s.curriculumOpened, s.progress, settings.known_stability_days, settings.known_min_reviews]);
+  }, [s.cards, s.tags, s.helpLang, s.curriculum, s.curriculumOpened, s.progress, settings.known_stability_days, settings.known_min_reviews]);
 
   const save = async (next: string[]) => {
     setState({ studyTags: next });
@@ -44,7 +48,14 @@ export function Topics({ onDone }: { onDone: () => void }) {
       <div class="chips">
         {rows.map((r) => (
           <button key={r.tag} class={`chip${selected.has(r.tag) ? ' on' : ''}`} aria-pressed={selected.has(r.tag)} onClick={() => toggle(r.tag)}>
-            <span class="chip-label">{r.label}</span>
+            <span class="chip-label" lang="nl" dir="auto">
+              {r.label}
+            </span>
+            {r.help && r.help !== r.label && (
+              <span class="chip-help" lang={s.helpLang ?? undefined} dir="auto">
+                {r.help}
+              </span>
+            )}
             <span class="chip-count">
               {r.locked ? `🔒 ${t('tags.locked')}` : t('home.cards', { n: r.count })}
             </span>

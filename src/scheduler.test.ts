@@ -6,7 +6,7 @@ import type { Card } from './types';
 const DAY = 86_400_000;
 const sched = makeScheduler({ desired_retention: 0.9 });
 const now = new Date('2026-09-28T10:00:00Z');
-const word = { id: 'c_1', type: 'word' } as Card;
+const word = { id: 'c_1', type: 'word', help: 'la maison' } as Card;
 
 /** Reviews a card n times with the same rating, each time when due. */
 function drill(rating: 1 | 2 | 3 | 4, times: number, start = now): { p: Progress; at: Date } {
@@ -82,5 +82,7 @@ describe('tracks', () => {
     const strong = drill(3, 4).p;
     expect(strong.stability).toBeGreaterThanOrEqual(3);
     expect(tracksFor(word, strong, settings)).toEqual(['recog', 'prod']);
+    // Without a help text in the chosen language there is no prompt for the FR→NL direction.
+    expect(tracksFor({ ...word, help: '' }, strong, settings)).toEqual(['recog']);
   });
 });
