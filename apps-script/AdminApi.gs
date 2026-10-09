@@ -145,18 +145,20 @@ var ADMIN_ACTIONS = {
   },
   /**
    * Bulk upsert of translations: rows = [{card_id, lang, text, example?, status?}] (status default machine). Unknown
-   * card ids are skipped. Dry run unless dryRun:false.
+   * card ids are skipped; a machine row never replaces a reviewed one (kept). Dry run unless dryRun:false.
    */
   'admin.setTranslations': function (b) {
     var rows = Array.isArray(b.rows) ? b.rows : [];
     var ids = {};
     readTable_(sheet_('Cards')).rows.forEach(function (r) { ids[String(r.id)] = true; });
-    var existing = readTranslations_(), plan = { add: 0, update: 0, unknown: [], bad: [] };
+    var existing = readTranslations_(), plan = { add: 0, update: 0, kept_reviewed: [], unknown: [], bad: [] };
     var ok = rows.filter(function (r) {
       var lang = String(r && r.lang || '').toLowerCase();
       if (!r || !ids[String(r.card_id)]) { plan.unknown.push(r && r.card_id); return false; }
       if (!languages_([lang]) || !String(r.text || '').trim() || (r.status && TRANSLATION_STATUS.indexOf(r.status) === -1)) { plan.bad.push(r.card_id); return false; }
-      if ((existing[String(r.card_id)] || {})[lang]) plan.update++; else plan.add++;
+      var cur = (existing[String(r.card_id)] || {})[lang];
+      if (cur && cur.status === 'reviewed' && (r.status || 'machine') === 'machine') { plan.kept_reviewed.push(r.card_id); return false; }
+      if (cur) plan.update++; else plan.add++;
       return true;
     });
     if (b.dryRun !== false) { plan.dryRun = true; return plan; }
