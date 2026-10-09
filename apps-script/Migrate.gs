@@ -21,7 +21,7 @@ function splitGloss_(answer) {
   var m = String(answer || '').match(/^(.*?)\s+—\s+(.*)$/);
   if (!m) return null;
   var after = m[2].trim(), paren = '';
-  var p = after.match(/^(.*?)\s*(\([^()]*\))\s*$/);
+  var p = after.match(/^(.*?)\s+(\([^()]*\))\s*$/); // only a parenthesis after a space is Dutch ("heure (3:00u = drie uur)"), not "minute(s)"
   if (p) { after = p[1].trim(); paren = ' ' + p[2]; }
   return { nl: m[1].trim() + paren, other: after };
 }
