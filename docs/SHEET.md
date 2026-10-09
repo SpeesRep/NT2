@@ -18,6 +18,36 @@ Google asks for confirmation if you resize or edit there; that is expected and s
 reordered, but never rename a header. `setup()` is idempotent: re-running it repairs headers,
 validation and the Dashboard, seeds only empty tabs, and seeds Cards only in DEV.
 
+## v2 — multi-group (current since 2026-10-09)
+
+Spec: "SpeesRep — multi-group architecture" (Claude Docs). One Sheet per environment, **owned and opened only by
+the owner** (speesrep@gmail.com); teachers never get access. Relations go by id, never by name. Migrated from the
+Fanki sheet by the admin action `migrateV2` (Migrate.gs; dry run first; hidden `v1_*` backups of Cards, Inbox,
+Curriculum, Tags, Settings; Script Property `MIGRATED_V2` = done).
+
+| Tab | Columns | Notes |
+|---|---|---|
+| `Cards` | id, type, nl, article, pos, example_nl, tags, flags, answer, added, active, status | Shared bank, existing ids. `status`: draft · approved · rejected (only approved can reach a group). No language columns. `answer` is Dutch (the French part of the 8 abbreviation answers moved to Translations). |
+| `Translations` | card_id, lang, text, example, status, updated | One row per card per help language (fr, en). `status`: machine · reviewed. Replaces Cards.fr / example_fr. |
+| `GroupCards` | group_code, card_id, status, updated | inbox · accepted · hidden. Only accepted cards are published for that group. |
+| `Institutions` | inst_id, label, active | label is for the owner only. |
+| `Teachers` | teacher_id, inst_id, label, key_hash, active, created | No name or email; SHA-256 of the invite key (phase 2). |
+| `Groups` | group_code, inst_id, display_name, languages, active, content_version | 8 random characters (no 0/o, 1/l/i); display_name is public, so neutral ("Groep Zon"). |
+| `GroupTeachers` | group_code, teacher_id | |
+| `Curriculum` | group_code, order, tag, regel, datum, percentage, van_tags, version | One table for all groups; rules unchanged (altijd / datum / bekend / dicht). |
+| `Proposals` | proposal_id, group_code, teacher_id, type, card_id, nl, example_nl, note, status, created | New words / corrections from teachers (phase 6). |
+| `AuditLog` | timestamp, teacher_id, action, group_code | No student data. |
+| `Tags`, `Settings` | unchanged | `require_approval` is gone (approval is `status` now). |
+
+- Drafts (Fanki's Inbox) are Cards rows with status draft. The owner approves them on the owner-only Controleren
+  page; until teachers accept cards on `/docent/` (phase 6), approving also accepts the card in the default group.
+- The Fanki tabs **Inbox** (hidden), **Progress**, **Log** and **Dashboard** are left after the migration; Progress and
+  Log are the Fanki learner's data. `deleteTabs` (dry run) removes them.
+- Admin actions run through the GitHub workflow "Admin action" (`gh workflow run admin.yml -f env=dev -f
+  action=migrateV2 -f payload='{"dryRun":true}'`), which holds the admin token; nobody needs it locally.
+
+**Everything below this line describes the Fanki (v1) sheet** and is kept for reference until phases 2–6 replace it.
+
 ## Not in the sheet: 🚩 "Gemarkeerd" (student flags)
 
 During review the learner can tap 🚩 on any card (long-press or "+ notitie" adds a short note). These are

@@ -5,8 +5,11 @@ learner). Code copied from Fanki on 2026-10-06 without history; technical names 
 (IndexedDB `NS` `speesrep-prod`/`speesrep-dev`, Workbox cacheId, backup `app`) and the URLs `/NT2/`.
 
 **Core rule: no data collection.** All progress stays on the device; the app only fetches the word list.
-Work in progress (phases): 1 repo/rename/config ✓ · 2 static content.json ✓ · 3 progress export/import +
-storage.persist ✓ · 4 multiple groups (design first). Sections below that still talk about syncing reviews to the
+Work in progress: first setup (repo, content.json, backups) ✓, then the multi-group spec ("SpeesRep — multi-group
+architecture", Claude Docs): 1 lock down + sheet v2 ✓ (DEV) · 2 API with teacher keys · 3 publishing per group, no
+commits · 4 student app: group code, help languages · 5 /docent/ teacher page · 6 card workflow. Sheet v2:
+docs/SHEET.md › v2. The old Apps Script pages are OWNER-ONLY (teacherAccess MYSELF) until /docent/ replaces them.
+Admin actions: GitHub workflow "Admin action" (admin.yml) — no admin token on this machine. Sections below that still talk about syncing reviews to the
 Sheet, Log/Progress or "her" are inherited from Fanki and outdated where they contradict this header.
 
 ## Content publishing (no data collection)
